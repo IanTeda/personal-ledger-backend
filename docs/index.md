@@ -19,3 +19,6 @@ This is a Rust-based backend server using Tonic for gRPC services.
 ## API Documentation
 
 See [API Documentation](api.md) for detailed gRPC service definitions.
+
+
+Local testing: Run `mkdocs serve`
