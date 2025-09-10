@@ -131,4 +131,5 @@ test-outputs/
 # Ignore mdBook build output and cache in repo
 docs/book/
 docs/target/
+docs/rustdoc/
 docs/index.html

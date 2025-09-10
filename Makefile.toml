@@ -13,6 +13,21 @@
 # Example: cargo make docs-serve
 # -----------------------------------------------------------------------------
 
+[tasks.docs-rustdoc]
+description = "Build Rust docs (with RUSTDOCFLAGS to set asset root)"
+env = { RUSTDOCFLAGS = "-Z unstable-options --static-root-path /rust-docs" }
+command = "sh"
+args = ["-c", "cargo +nightly doc --no-deps --target-dir docs/rustdoc"]
+
+[tasks.docs-mdbook]
+description = "Build mdBook documentation"
+command = "sh"
+args = ["-c", "mdbook build"]
+
+[tasks.docs-build]
+description = "Build all documentation"
+dependencies = ["docs-rustdoc", "docs-mdbook"]
+
 [tasks.docs-serve]
 install_crate = "mdbook"
 description = "Serve mdBook documentation on port 8001"

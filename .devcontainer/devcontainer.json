@@ -5,7 +5,10 @@
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/git:1": {}
   },
-  "postCreateCommand": "cargo install mdbook cargo-make cargo-watch cargo-audit && rustup component add clippy rustfmt && apt update && apt install -y protobuf-compiler",
+  "mounts": [
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+  ],
+  "postCreateCommand": "cargo install mdbook cargo-make cargo-watch cargo-audit && rustup component add clippy rustfmt && sudo apt-get update && sudo apt-get install -y protobuf-compiler libprotobuf-dev",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,9 +19,9 @@
       ]
     }
   },
-  "forwardPorts": [8000],
+  "forwardPorts": [8001],
   "portsAttributes": {
-    "8000": {
+    "8001": {
       "label": "mdBook Server"
     }
   },
