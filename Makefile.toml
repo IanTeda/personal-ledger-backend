@@ -1,0 +1,20 @@
+#-- .Makefile.toml ---
+
+# ==============================================================================
+# Makefile.toml for cargo-make
+#
+# Cargo Make is a task runner for Rust projects that allows you to define custom tasks
+# in a simple TOML format. It provides a way to automate common development workflows
+# like building, testing and serving documentation.
+#
+# This file defines tasks for the personal-ledger-backend project.
+#
+# Usage: cargo make <task-name>
+# Example: cargo make docs-serve
+# -----------------------------------------------------------------------------
+
+[tasks.docs-serve]
+install_crate = "mdbook"
+description = "Serve mdBook documentation on port 8001"
+command = "mdbook"
+args = ["serve", "--port", "8001"]

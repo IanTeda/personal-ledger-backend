@@ -1,0 +1,18 @@
+[book]
+title = "Personal Ledger Backend Documentation"
+author = ["Ian Teda"]
+description = "Documentation for the Personal Ledger Backend."
+multilingual = false
+language = "en"
+text-direction = "ltr"
+src = "docs"
+
+[build]
+build-dir = "docs/book"
+create-missing = false
+
+[rust]
+edition = "2021"
+
+[output.html]
+default-theme = "dark"

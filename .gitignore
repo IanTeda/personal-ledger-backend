@@ -18,6 +18,7 @@
 !.cargo
 !.cargo/config.toml
 !.cargo/config
+!.mdbook-ignore
 
 
 # ---------------------------[ UNDERSCOE FILES ]--------------------------------
@@ -124,6 +125,10 @@ test-outputs/
 test-results/
 test-outputs/
 
-# Added by cargo
 
-/target
+# ------------------------------[ OTHER FILES ]--------------------------------
+
+# Ignore mdBook build output and cache in repo
+docs/book/
+docs/target/
+docs/index.html
