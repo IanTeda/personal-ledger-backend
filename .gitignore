@@ -123,3 +123,7 @@ test-outputs/
 # Test artifacts
 test-results/
 test-outputs/
+
+# Added by cargo
+
+/target

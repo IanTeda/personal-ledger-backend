@@ -1,0 +1,28 @@
+{
+  "name": "Rust",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/python:1": {}
+  },
+  "postCreateCommand": "python3 -m pip install --user mkdocs mkdocs-material && cargo install cargo-tarpaulin cargo-audit && rustup component add clippy rustfmt",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "ms-vscode.vscode-json",
+        "ms-python.python",
+        "ms-vscode.vscode-markdownlint",
+        "redhat.vscode-yaml"
+      ]
+    }
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "MkDocs Server"
+    }
+  },
+  "remoteUser": "vscode"
+}
