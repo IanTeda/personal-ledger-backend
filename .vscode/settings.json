@@ -1,0 +1,30 @@
+{
+  "editor.inlineSuggest.enabled": true,
+  "github.copilot.inlineSuggest.enable": true,
+  "github.copilot.enable": {},
+  "protoc": {
+    "path": "/usr/bin/protoc",
+    "compile_on_save": false,
+    "options": [
+      "--proto_path=protos/v3",
+      "--proto_path=${workspaceRoot}/proto"
+    ]
+  },
+  "sqltools.connections": [
+    {
+      "previewLimit": 50,
+      "server": "localhost",
+      "driver": "PostgreSQL",
+      "name": "Backend",
+      "connectString": "postgrespostgres://postgres:postgres@localhost:5432/"
+    }
+  ],
+  "todo-tree.general.tags": [
+    "BUG",
+    "HACK",
+    "FIXME",
+    "TODO",
+    "XXX",
+    "- [ ]"
+  ],
+}

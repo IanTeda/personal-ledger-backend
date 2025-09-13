@@ -1,0 +1,15 @@
+{
+    "recommendations": [
+        "ms-vscode.vscode-markdownlint",
+        "redhat.vscode-yaml",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "usernamehw.errorlens",
+        "vadimcn.vscode-lldb",
+        "gruntfuggly.todo-tree",
+        "github.copilot",
+        "ms-azuretools.vscode-docker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+    ]
+}
