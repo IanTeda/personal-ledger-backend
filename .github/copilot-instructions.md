@@ -9,7 +9,9 @@ This repository is following the principals of [Zero to Production](https://gith
 ## Filestructure
 
 - `config/` - Contains the server configuration files that are loaded at startup.
-- `docs/` - Contains documentation for the project, including copilot instructions, API specifications and user guides.
+- `docs/` - Contains documentation for the project, API specifications and user guides.
+- `.github/copilot-instructions/` - Contains copilot instructions for the project.
+- `.github/copilot-prompts/` - Contains copilot prompts for the project.
 - `migrations/` - Contains the SQLX database migrations.
 - `protos/` - Contains the GPRC protobuf definitation files as a git submodule.
 - `src/database/things/` - Contains the SQLX database service files for things, including seperate fils for delete, instert, model, read and update.
