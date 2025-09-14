@@ -27,4 +27,17 @@
     "XXX",
     "- [ ]"
   ],
+  "mcp.serversFile": ".vscode/mcp-servers.json",
+  "mcp.servers": {
+    "awesome-copilot": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest"
+      ]
+    }
+  }
 }

@@ -3,7 +3,8 @@
   "image": "mcr.microsoft.com/devcontainers/rust:1-bullseye",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/git:1": {}
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:1": {}
   },
   "mounts": [
     "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
@@ -12,10 +13,17 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "rust-lang.rust-analyzer",
-        "ms-vscode.vscode-json",
         "ms-vscode.vscode-markdownlint",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "usernamehw.errorlens",
+        "vadimcn.vscode-lldb",
+        "gruntfuggly.todo-tree",
+        "github.copilot",
+        "ms-azuretools.vscode-docker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
       ]
     }
   },

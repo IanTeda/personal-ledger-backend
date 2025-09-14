@@ -1,6 +1,30 @@
 # Repository Context (for Copilot)
 
+This respository is the backend server for the 'Personal Ledger' project. 'Personal Ledger' aims to provide its users with an intuitive and user-friendly interface that offers insights into their spending habits and investment position. By presenting information clearly and concisely, users can effectively monitor their overall financial health, make informed decisions, and ultimately achieve their personal financial goals.
+
+This repository should run as a deamon server that interfaces with a database and provides gRPC responses with the requested data.
+
 This repository is following the principals of [Zero to Production](https://github.com/LukeMathWalker/zero-to-production), but is using gRPC instead of REST to server the API.
+
+## Filestructure
+
+- `config/` - Contains the server configuration files that are loaded at startup.
+- `docs/` - Contains documentation for the project, including copilot instructions, API specifications and user guides.
+- `migrations/` - Contains the SQLX database migrations.
+- `protos/` - Contains the GPRC protobuf definitation files as a git submodule.
+- `src/database/things/` - Contains the SQLX database service files for things, including seperate fils for delete, instert, model, read and update.
+- `src/domain/object.rs` - Contains application domain custom types including struct, new, parsing, intotypes and unit tests.
+- `src/services/endpoint` - Contains the GRPC endpoing services.
+- `src/utils/utility.rs` - Contains the servers general utilility modules that are used across modules.
+- `src/config.rs` - Contains the server configuration module.
+- `src/error.rs` - Contains the server error types.
+- `src/lib.rs` - Contains the server rust library module.
+- `src/main.rs` - Contains the server main entry point.
+- `src/router.rs` - Contains the server rpc api routes.
+- `src/rpc.rs` - Contains the Tonic import module.
+- `src/startup.rs` - Contains the Tonic startup module and logic abstracted to allow for consistent server setup for intergation tests with the actual server.
+- `src/telemetry.rs` - Contains the configuration for using telemetry for logging since we are going to be async.
+
 
 ## Quick facts
 
@@ -40,27 +64,7 @@ This repository is following the principals of [Zero to Production](https://gith
 - Prefer `secrecy::Secret` for secrets and tokens in memory.
 - Use `thiserror::Error` for domain errors and map `sqlx::Error` to structured error variants
 - Avoid `SELECT *` in SQL queries; list explicit columns
-- Use Australian English when writting comments
-
-
-## Filestructure
-
-- `config/` - Application configuration files
-- `docs/` - Project documentation
-- `migrations/` - SQLX database migrations
-- `protos/` - GPRC protobuf definitation files
-- `src/database/things/[delete.rs, insert.rs, mod.rs, model.rs, read.rs, update.rs]` - SQLX database service files
-- `src/domain/object.rs` - Application domain types including struct, new, parsing, intotypes and unit tests
-- `src/services/endpoint` - GRPC service endpoints
-- `src/utils/utility.rs` - Application general utilility functions and modules
-- `src/config.rs` - Application configuration module
-- `src/error.rs` - Application error types
-- `src/lib.rs` - Application library module
-- `src/main.rs` - Application main entry point
-- `src/router.rs` - Application endpoint definitions
-- `src/rpc.rs` - Tonic import module
-- `src/startup.rs` - Tonic startup module and logic abstracted to allow for consistent server configuration for intergation tests
-- `src/telemetry.rs` - Use telemetry for logging since we are going to be async
+- Use Australian English when writing comments
 
 
 ## Testing Guidance
@@ -113,3 +117,4 @@ Suggested review checklist for AI-generated changes:
 
 - When changing code, prefer small, test-covered patches.
 - If a change alters public APIs, update README and docs.
+
