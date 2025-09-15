@@ -1,6 +1,32 @@
 [package]
 name = "personal-ledger-backend"
+authors = ["Ian Teda <ian@teda.id.au>"]
 version = "0.1.0"
 edition = "2024"
+description = "The tonic backend server for Personal Ledger."
+documentation = "https://ianteda.github.io/personal-ledger-backend/"
+homepage = "https://github.com/IanTeda/personal_ledger-backend"
+repository = "https://github.com/IanTeda/personal_ledger-backend"
+readme = "README.md"
+license-file = "LICENSE.txt"
+keywords = ["rust", "ledger", "money", "grpc", "tonic"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[lib]
+doctest = false
+path = "src/lib.rs"
+
+[[bin]]
+name = "personal_ledger_backend"
+path = "src/main.rs"
 
 [dependencies]
+prost = { version = "0.14"}
+tonic = { version = "0.14"}
+tonic-prost = { version = "0.14" }
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+tonic-prost-build = { version = "0.14" }
