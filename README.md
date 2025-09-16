@@ -66,6 +66,8 @@ Project docs live in the `docs/` folder. They can be browsed at [https://ianteda
 
 Protobuf files are stored under `protos/` (submodule). The build script `build.rs` compiles protos into Rust types — ensure `protoc` is available (the devcontainer installs `protobuf-compiler`).
 
+Concirm gRPC reflections service with `grpcurl -plaintext localhost:50051 list`
+
 ## Code Quality
 
 - Formatting: `cargo fmt` / `rustfmt`

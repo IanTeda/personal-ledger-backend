@@ -6,11 +6,11 @@
 // to build the code in the OUT_DIR (i.e. /target) instead of directly in src/rpc.
 // This will also require adjusting the module paths in src/rpc/mod.rs accordingly.
 
-// use std::{env, path::PathBuf};
+use std::{env, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get the cargo OUT_DIR environment variable, which is where the generated code will be placed
-    // let out_dir = PathBuf::from(env::var("OUT_DIR")?);
+    let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     
     // Re-run the build script if any .proto files change
     println!("cargo:rerun-if-changed=proto/");
@@ -19,13 +19,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Compile all .proto files in the proto/ directory
     tonic_prost_build::configure()
-        .out_dir("src/rpc")
+        // .out_dir("src/rpc")
         .protoc_arg("--experimental_allow_proto3_optional")
         .build_client(true)
         .build_server(true)
         .build_transport(true)
-        .compile_well_known_types(false)
-        // .file_descriptor_set_path(out_dir.join("personal_ledger_descriptor.bin"))
+        .compile_well_known_types(true)
+        .file_descriptor_set_path(out_dir.join("personal_ledger_descriptor.bin"))
         .compile_protos(
           &["proto/utilities.proto"], 
           &["proto/"])?;
