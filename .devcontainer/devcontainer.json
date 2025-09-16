@@ -4,12 +4,16 @@
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers-extra/features/grpcurl-asdf:2": {},
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+        "packages": "protobuf-compiler, libprotobuf-dev"
+    }
   },
   "mounts": [
     "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
   ],
-  "postCreateCommand": "cargo install mdbook cargo-make cargo-watch cargo-audit && rustup component add clippy rustfmt && sudo apt-get update && sudo apt-get install -y protobuf-compiler libprotobuf-dev",
+  "postCreateCommand": "rustup component add clippy rustfmt && cargo install mdbook cargo-make cargo-watch cargo-audit",
   "customizations": {
     "vscode": {
       "extensions": [
