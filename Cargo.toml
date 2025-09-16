@@ -25,6 +25,7 @@ path = "src/main.rs"
 [dependencies]
 prost = { version = "0.14"}
 tonic = { version = "0.14"}
+tonic-health = { version = "0.14" }
 tonic-prost = { version = "0.14" }
 tonic-reflection = { version = "0.14" }
 tokio = { version = "1", features = ["full"] }

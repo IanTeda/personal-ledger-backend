@@ -40,6 +40,7 @@ impl UtilitiesService for MyUtilitiesService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
+    // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()
         .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
         .build_v1()
@@ -48,9 +49,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse().unwrap();
     let utility_server = MyUtilitiesService::default();
 
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<UtilitiesServiceServer<MyUtilitiesService>>()
+        .await;
+
     println!("UtilitiesServiceServer listening on {addr}");
 
+    // Build Tonic gRPC server
     Server::builder()
+        .add_service(health_service)
         .add_service(reflections_service)
         .add_service(UtilitiesServiceServer::new(utility_server))
         .serve(addr)
