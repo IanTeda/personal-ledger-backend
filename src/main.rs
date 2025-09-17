@@ -5,31 +5,20 @@
 /// The server currently implements a simple UtilitiesService with a Ping method to demonstrate functionality.
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_reflection::server as TonicRefelectionServer;
-
-mod proto {
-    // The string specified here must match the proto package name
-    tonic::include_proto!("personal_ledger");
-
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("personal_ledger_descriptor");
-}
-
-use crate::proto::utilities_service_server::UtilitiesService;
-use crate::proto::utilities_service_server::UtilitiesServiceServer;
-use crate::proto::{PingRequest, PingResponse};
+use personal_ledger_backend::rpc;
 
 #[derive(Default)]
 pub struct MyUtilitiesService {}
 
 #[tonic::async_trait]
-impl UtilitiesService for MyUtilitiesService {
+impl rpc::UtilitiesService for MyUtilitiesService {
     async fn ping(
         &self,
-        request: Request<PingRequest>,
-    ) -> Result<Response<PingResponse>, Status> {
+        request: Request<rpc::PingRequest>,
+    ) -> Result<Response<rpc::PingResponse>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
 
-        let reply: PingResponse = PingResponse {
+        let reply: rpc::PingResponse = rpc::PingResponse {
             message: "Pong...".to_string(),
         };
 
@@ -42,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()
-        .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(rpc::FILE_DESCRIPTOR_SET)
         .build_v1()
         .unwrap();
 
@@ -51,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
-        .set_serving::<UtilitiesServiceServer<MyUtilitiesService>>()
+        .set_serving::<rpc::UtilitiesServiceServer<MyUtilitiesService>>()
         .await;
 
     println!("UtilitiesServiceServer listening on {addr}");
@@ -60,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(health_service)
         .add_service(reflections_service)
-        .add_service(UtilitiesServiceServer::new(utility_server))
+        .add_service(rpc::UtilitiesServiceServer::new(utility_server))
         .serve(addr)
         .await?;
 
