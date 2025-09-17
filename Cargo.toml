@@ -23,8 +23,9 @@ name = "personal_ledger_backend"
 path = "src/main.rs"
 
 [dependencies]
-prost = { version = "0.14"}
-tonic = { version = "0.14"}
+prost = { version = "0.14" }
+thiserror = { version = "2.0" }
+tonic = { version = "0.14" }
 tonic-health = { version = "0.14" }
 tonic-prost = { version = "0.14" }
 tonic-reflection = { version = "0.14" }

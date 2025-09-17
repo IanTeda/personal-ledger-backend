@@ -9,5 +9,9 @@
 //! ## Modules
 //!
 //! - [`rpc`]: Generated and re-exported gRPC types and services for the API.
+//! - [`error`]: Standardized error types and handling utilities.
 //!
+mod error;
 pub mod rpc;
+
+pub use error::{LedgerError, LedgerResult};

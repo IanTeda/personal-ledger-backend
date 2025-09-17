@@ -5,7 +5,7 @@
 /// The server currently implements a simple UtilitiesService with a Ping method to demonstrate functionality.
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_reflection::server as TonicRefelectionServer;
-use personal_ledger_backend::rpc;
+use personal_ledger_backend::{LedgerResult, rpc};
 
 #[derive(Default)]
 pub struct MyUtilitiesService {}
@@ -27,7 +27,7 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> LedgerResult<()> {
 
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()
