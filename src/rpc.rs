@@ -1,3 +1,5 @@
+//-- ./src/rpc.rs
+
 //! gRPC API module for Personal Ledger Backend.
 //!
 //! This module provides the generated gRPC client/server types and message types for the

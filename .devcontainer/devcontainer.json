@@ -7,7 +7,7 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers-extra/features/grpcurl-asdf:2": {},
     "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
-        "packages": "protobuf-compiler, libprotobuf-dev"
+        "packages": "protobuf-compiler, libprotobuf-dev, mkcert, libnss3-tools"
     }
   },
   "mounts": [

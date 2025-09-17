@@ -33,3 +33,10 @@ install_crate = "mdbook"
 description = "Serve mdBook documentation on port 8001"
 command = "mdbook"
 args = ["serve", "--port", "8001"]
+
+## Update git submodules in repository
+## $ git submodule update --recursive --remote
+## $ cargo make submodules
+[tasks.submodules]
+command = "git"
+args = ["submodule", "update", "--recursive", "--remote"]
