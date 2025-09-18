@@ -5,7 +5,7 @@
 /// The server currently implements a simple UtilitiesService with a Ping method to demonstrate functionality.
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_reflection::server as TonicRefelectionServer;
-use personal_ledger_backend::{LedgerResult, rpc};
+use personal_ledger_backend::{rpc, telemetry::{self, TelemetryLevel}, LedgerResult};
 
 #[derive(Default)]
 pub struct MyUtilitiesService {}
@@ -29,6 +29,8 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 #[tokio::main]
 async fn main() -> LedgerResult<()> {
 
+    let _tracing = telemetry::init(TelemetryLevel::INFO);
+
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()
         .register_encoded_file_descriptor_set(rpc::FILE_DESCRIPTOR_SET)
@@ -43,7 +45,7 @@ async fn main() -> LedgerResult<()> {
         .set_serving::<rpc::UtilitiesServiceServer<MyUtilitiesService>>()
         .await;
 
-    println!("UtilitiesServiceServer listening on {addr}");
+    tracing::info!("Tonic server started at '{}'", addr);
 
     // Build Tonic gRPC server
     Server::builder()
