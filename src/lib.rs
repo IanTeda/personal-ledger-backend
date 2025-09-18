@@ -11,10 +11,13 @@
 //! - [`rpc`]: Generated and re-exported gRPC types and services for the API.
 //! - [`error`]: Standardized error types and handling utilities.
 //! - [`tracing`]: Comprehensive logging and tracing functionality.
+//! - [`config`]: Configuration loading and management.
 //!
 mod error;
+pub mod config;
 pub mod rpc;
 pub mod telemetry;
 
 // Re-Exports for cleaner code
 pub use error::{LedgerError, LedgerResult};
+pub use config::LedgerConfig;

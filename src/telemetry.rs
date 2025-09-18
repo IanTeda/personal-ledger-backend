@@ -194,10 +194,10 @@ impl From<TelemetryError> for crate::LedgerError {
     fn from(error: TelemetryError) -> Self {
         match error {
             TelemetryError::SubscriberInit(_) => crate::LedgerError::Internal(error.to_string()),
-            TelemetryError::EnvFilter(_) => crate::LedgerError::Config(error.to_string()),
+            TelemetryError::EnvFilter(_) => crate::LedgerError::Configuration(error.to_string()),
             TelemetryError::LogTracerInit(_) => crate::LedgerError::Internal(error.to_string()),
             TelemetryError::Io(e) => crate::LedgerError::Io(e),
-            TelemetryError::Config(_) => crate::LedgerError::Config(error.to_string()),
+            TelemetryError::Config(_) => crate::LedgerError::Configuration(error.to_string()),
         }
     }
 }
@@ -334,7 +334,7 @@ mod tests {
         // Test Config error conversion
         let telemetry_err = TelemetryError::config("Test error");
         let ledger_err: crate::LedgerError = telemetry_err.into();
-        assert!(matches!(ledger_err, crate::LedgerError::Config(_)));
+        assert!(matches!(ledger_err, crate::LedgerError::Configuration(_)));
 
         // Test SubscriberInit error conversion
         let telemetry_err = TelemetryError::subscriber_init("Test error");
@@ -344,7 +344,7 @@ mod tests {
         // Test EnvFilter error conversion
         let telemetry_err = TelemetryError::env_filter("Test error");
         let ledger_err: crate::LedgerError = telemetry_err.into();
-        assert!(matches!(ledger_err, crate::LedgerError::Config(_)));
+        assert!(matches!(ledger_err, crate::LedgerError::Configuration(_)));
     }
 
     /// Tests conversion from std::io::Error to TelemetryError and through to LedgerError.
