@@ -47,6 +47,10 @@ pub enum LedgerError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Network address parsing errors
+    #[error("Address parsing error: {0}")]
+    AddrParse(#[from] std::net::AddrParseError),
+
     /// Data validation errors
     #[error("Validation error: {0}")]
     Validation(String),
@@ -111,6 +115,9 @@ impl From<LedgerError> for tonic::Status {
             }
             LedgerError::Io(_) => {
                 tonic::Status::internal("I/O error occurred")
+            }
+            LedgerError::AddrParse(_) => {
+                tonic::Status::invalid_argument("Invalid network address format")
             }
             LedgerError::Validation(msg) => {
                 tonic::Status::invalid_argument(msg)
@@ -178,6 +185,13 @@ mod tests {
 
         let io_err = LedgerError::Io(io::Error::new(io::ErrorKind::NotFound, "test"));
         assert!(matches!(io_err, LedgerError::Io(_)));
+
+        // Test AddrParse variant by parsing an invalid address
+        let addr_parse_result: Result<std::net::SocketAddr, std::net::AddrParseError> = "invalid:address:99999".parse();
+        if let Err(addr_parse_err) = addr_parse_result {
+            let ledger_err: LedgerError = addr_parse_err.into();
+            assert!(matches!(ledger_err, LedgerError::AddrParse(_)));
+        }
 
         let validation_err = LedgerError::Validation("test".to_string());
         assert!(matches!(validation_err, LedgerError::Validation(_)));
@@ -254,6 +268,15 @@ mod tests {
         let status: Status = io_err.into();
         assert_eq!(status.code(), Code::Internal);
         assert!(status.message().contains("I/O error"));
+
+        // Test AddrParse variant
+        let addr_parse_result: Result<std::net::SocketAddr, std::net::AddrParseError> = "invalid:address:99999".parse();
+        if let Err(addr_parse_err) = addr_parse_result {
+            let ledger_err: LedgerError = addr_parse_err.into();
+            let status: Status = ledger_err.into();
+            assert_eq!(status.code(), Code::InvalidArgument);
+            assert!(status.message().contains("Invalid network address format"));
+        }
 
         // Test Internal variant
         let internal_err = LedgerError::Internal("Internal error".to_string());

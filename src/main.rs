@@ -29,6 +29,7 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 #[tokio::main]
 async fn main() -> LedgerResult<()> {
 
+    let config = personal_ledger_backend::LedgerConfig::parse()?;
     let _tracing = telemetry::init(TelemetryLevel::INFO);
 
     // Build reflections service
@@ -37,7 +38,9 @@ async fn main() -> LedgerResult<()> {
         .build_v1()
         .unwrap();
 
-    let addr = "0.0.0.0:50051".parse().unwrap();
+    let server_address = config.server_address()?;
+    tracing::info!("Starting Tonic server at '{}'", server_address);
+
     let utility_server = MyUtilitiesService::default();
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
@@ -45,14 +48,14 @@ async fn main() -> LedgerResult<()> {
         .set_serving::<rpc::UtilitiesServiceServer<MyUtilitiesService>>()
         .await;
 
-    tracing::info!("Tonic server started at '{}'", addr);
+    tracing::info!("Tonic server started at '{}'", server_address);
 
     // Build Tonic gRPC server
     Server::builder()
         .add_service(health_service)
         .add_service(reflections_service)
         .add_service(rpc::UtilitiesServiceServer::new(utility_server))
-        .serve(addr)
+        .serve(server_address)
         .await?;
 
     Ok(())

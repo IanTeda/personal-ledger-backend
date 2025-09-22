@@ -1,7 +1,7 @@
 # Summary
 
 - [Home](../README.md)
-
+- [Configuration](configuration.md)
 
 -----------
 
