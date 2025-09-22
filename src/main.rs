@@ -30,7 +30,10 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 async fn main() -> LedgerResult<()> {
 
     let config = personal_ledger_backend::LedgerConfig::parse()?;
-    let _tracing = telemetry::init(TelemetryLevel::INFO);
+    let log_level = config.log_level();
+
+    let _tracing = telemetry::init(log_level);
+    tracing::info!("Starting tracing at level '{:?}'", log_level);
 
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()

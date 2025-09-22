@@ -14,13 +14,40 @@
 //! - `Authentication`: JWT and authentication-related errors
 //! - `Internal`: Internal server errors and unexpected conditions
 
-/// Result type alias for convenience
+use crate::telemetry;
+
+/// Result type used across the application.
+///
+/// This is a convenience alias for functions that return a `Result` with
+/// `LedgerError` as the error type. Use `LedgerResult<T>` for clarity in APIs.
+///
+/// Example:
+///
+/// ```rust
+/// fn do_work() -> LedgerResult<()> {
+///     Err(LedgerError::internal("boom"))
+/// }
+/// ```
 pub type LedgerResult<T> = std::result::Result<T, LedgerError>;
 
-/// Custom error type for the Personal Ledger backend application.
+/// Central application error type
 ///
-/// This enum centralizes all error types used throughout the application,
-/// providing consistent error handling and conversion to appropriate HTTP/gRPC status codes.
+/// `LedgerError` unifies all errors the application can produce so they can
+/// be handled and converted in a single place. Use `From`/`into` conversions
+/// to convert other error types into `LedgerError` and then convert to a
+/// `tonic::Status` when returning errors over gRPC.
+///
+/// The enum intentionally keeps client-facing gRPC messages generic; full
+/// details are logged via `tracing` when converting to `tonic::Status` so
+/// operators can diagnose issues without leaking internals to clients.
+///
+/// Example (converting to gRPC status):
+///
+/// ```rust
+/// let err = LedgerError::validation("bad input");
+/// let status: tonic::Status = err.into();
+/// assert_eq!(status.code(), tonic::Code::InvalidArgument);
+/// ```
 #[derive(thiserror::Error, Debug)]
 pub enum LedgerError {
     /// Errors related to gRPC communication and Tonic framework
@@ -40,8 +67,11 @@ pub enum LedgerError {
     // Database(#[from] sqlx::Error),
 
     /// Configuration loading and parsing errors
-    #[error("Configuration error: {0}")]
-    Configuration(String),
+    // Note: use the structured `Config(crate::config::ConfigError)` variant
+    // for configuration errors. Previous code had a separate
+    // `Configuration(String)` variant which caused duplication; we now
+    // represent simple configuration messages as
+    // `Config(crate::config::ConfigError::Validation(...))`.
 
     /// File system and I/O operations
     #[error("I/O error: {0}")]
@@ -67,7 +97,7 @@ pub enum LedgerError {
 impl LedgerError {
     /// Creates a new configuration error
     pub fn configuration<S: Into<String>>(message: S) -> Self {
-        Self::Configuration(message.into())
+        Self::Config(crate::config::ConfigError::Validation(message.into()))
     }
 
     /// Creates a new validation error
@@ -87,9 +117,30 @@ impl LedgerError {
 }
 
 /// Convert ConfigError to LedgerError
+///
+/// This allows propagation of structured `ConfigError` values into the
+/// central `LedgerError` enum so they can be logged and translated to
+/// gRPC statuses in a single place.
 impl From<crate::config::ConfigError> for LedgerError {
     fn from(error: crate::config::ConfigError) -> Self {
         LedgerError::Config(error)
+    }
+}
+
+/// Conversion from `TelemetryError` to the application's main error type.
+///
+/// This implementation allows telemetry errors to be seamlessly integrated
+/// with the application's primary error handling system, ensuring consistent
+/// error propagation and handling across the codebase.
+impl From<telemetry::TelemetryError> for crate::LedgerError {
+    fn from(error: telemetry::TelemetryError) -> Self {
+        match error {
+            telemetry::TelemetryError::SubscriberInit(_) => LedgerError::Internal(error.to_string()),
+            telemetry::TelemetryError::EnvFilter(_) => LedgerError::Config(crate::config::ConfigError::Validation(error.to_string())),
+            telemetry::TelemetryError::LogTracerInit(_) => LedgerError::Internal(error.to_string()),
+            telemetry::TelemetryError::Io(e) => LedgerError::Io(e),
+            telemetry::TelemetryError::Config(_) => LedgerError::Config(crate::config::ConfigError::Validation(error.to_string())),
+        }
     }
 }
 
@@ -98,7 +149,8 @@ impl From<LedgerError> for tonic::Status {
     fn from(error: LedgerError) -> Self {
         match error {
             LedgerError::Grpc(status) => status,
-            LedgerError::TonicTransport(_) => {
+            LedgerError::TonicTransport(e) => {
+                tracing::error!(?e, "Tonic transport error");
                 tonic::Status::internal("Transport error occurred")
             }
             // Error::Database(sqlx::Error::RowNotFound) => {
@@ -107,13 +159,13 @@ impl From<LedgerError> for tonic::Status {
             // Error::Database(_) => {
             //     tonic::Status::internal("Database error occurred")
             // }
-            LedgerError::Config(_) => {
+            LedgerError::Config(e) => {
+                // Log structured config errors and return a generic client-facing message
+                tracing::error!(?e, "Configuration error");
                 tonic::Status::internal("Configuration error")
             }
-            LedgerError::Configuration(_) => {
-                tonic::Status::internal("Configuration error")
-            }
-            LedgerError::Io(_) => {
+            LedgerError::Io(e) => {
+                tracing::error!(?e, "I/O error");
                 tonic::Status::internal("I/O error occurred")
             }
             LedgerError::AddrParse(_) => {
@@ -125,7 +177,8 @@ impl From<LedgerError> for tonic::Status {
             LedgerError::Authentication(msg) => {
                 tonic::Status::unauthenticated(msg)
             }
-            LedgerError::Internal(_) => {
+            LedgerError::Internal(msg) => {
+                tracing::error!(%msg, "Internal server error");
                 tonic::Status::internal("Internal server error")
             }
         }
@@ -141,7 +194,7 @@ mod tests {
     #[test]
     fn test_error_creation() {
         let config_err = LedgerError::configuration("Invalid config");
-        assert!(matches!(config_err, LedgerError::Configuration(_)));
+        assert!(matches!(config_err, LedgerError::Config(_)));
 
         let validation_err = LedgerError::validation("Invalid data");
         assert!(matches!(validation_err, LedgerError::Validation(_)));
@@ -157,7 +210,7 @@ mod tests {
     fn test_error_creation_with_different_string_types() {
         // Test with &str
         let err1 = LedgerError::configuration("test message");
-        assert!(matches!(err1, LedgerError::Configuration(_)));
+        assert!(matches!(err1, LedgerError::Config(_)));
 
         // Test with String
         let err2 = LedgerError::validation("test message".to_string());
@@ -180,8 +233,8 @@ mod tests {
         let config_err = LedgerError::Config(crate::config::ConfigError::Validation("test".to_string()));
         assert!(matches!(config_err, LedgerError::Config(_)));
 
-        let configuration_err = LedgerError::Configuration("test".to_string());
-        assert!(matches!(configuration_err, LedgerError::Configuration(_)));
+    let configuration_err = LedgerError::Config(crate::config::ConfigError::Validation("test".to_string()));
+    assert!(matches!(configuration_err, LedgerError::Config(_)));
 
         let io_err = LedgerError::Io(io::Error::new(io::ErrorKind::NotFound, "test"));
         assert!(matches!(io_err, LedgerError::Io(_)));
@@ -206,7 +259,7 @@ mod tests {
     #[test]
     fn test_error_message_formatting() {
         let config_err = LedgerError::configuration("Test config error");
-        assert_eq!(format!("{}", config_err), "Configuration error: Test config error");
+        assert_eq!(format!("{}", config_err), "Configuration error: Invalid configuration: Test config error");
 
         let validation_err = LedgerError::validation("Test validation error");
         assert_eq!(format!("{}", validation_err), "Validation error: Test validation error");
@@ -222,8 +275,10 @@ mod tests {
     fn test_error_debug_formatting() {
         let err = LedgerError::configuration("Test error");
         let debug_str = format!("{:?}", err);
-        assert!(debug_str.contains("Configuration"));
-        assert!(debug_str.contains("Test error"));
+        // Config errors are now represented by `LedgerError::Config(ConfigError::Validation(_))`.
+        // The debug output will contain the `Config`/`ConfigError` variant name and the message.
+        assert!(debug_str.contains("Config"), "debug output should mention Config variant: {}", debug_str);
+        assert!(debug_str.contains("Test error"), "debug output should include the original message: {}", debug_str);
     }
 
     #[test]
@@ -257,11 +312,11 @@ mod tests {
         assert_eq!(status.code(), Code::Internal);
         assert!(status.message().contains("Configuration error"));
 
-        // Test Configuration variant
-        let configuration_err = LedgerError::Configuration("Config error".to_string());
-        let status: Status = configuration_err.into();
-        assert_eq!(status.code(), Code::Internal);
-        assert!(status.message().contains("Configuration error"));
+    // Test Configuration variant (now represented by Config(ConfigError::Validation))
+    let configuration_err = LedgerError::Config(crate::config::ConfigError::Validation("Config error".to_string()));
+    let status: Status = configuration_err.into();
+    assert_eq!(status.code(), Code::Internal);
+    assert!(status.message().contains("Configuration error"));
 
         // Test Io variant
         let io_err = LedgerError::Io(io::Error::new(io::ErrorKind::NotFound, "File not found"));
@@ -334,8 +389,12 @@ mod tests {
         let internal_err = LedgerError::internal("Database connection failed");
         assert_eq!(internal_err.to_string(), "Internal error: Database connection failed");
 
-        let config_err = LedgerError::configuration("Invalid port number");
-        assert_eq!(config_err.to_string(), "Configuration error: Invalid port number");
+    let config_err = LedgerError::configuration("Invalid port number");
+    // The Config variant wraps a ConfigError::Validation which formats as
+    // "Invalid configuration: <msg>". The LedgerError::Config display
+    // prefixes that with "Configuration error: ", resulting in a nested
+    // message. Assert the full produced string here.
+    assert_eq!(config_err.to_string(), "Configuration error: Invalid configuration: Invalid port number");
     }
 
     #[test]
@@ -343,8 +402,8 @@ mod tests {
         // Test that helper methods create the correct variants
         let config_err = LedgerError::configuration("test");
         match config_err {
-            LedgerError::Configuration(msg) => assert_eq!(msg, "test"),
-            _ => panic!("Expected Configuration variant"),
+            LedgerError::Config(crate::config::ConfigError::Validation(msg)) => assert_eq!(msg, "test"),
+            _ => panic!("Expected Config::Validation variant"),
         }
 
         let validation_err = LedgerError::validation("test");

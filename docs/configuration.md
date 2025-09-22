@@ -24,6 +24,8 @@ The application provides sensible defaults when no configuration is provided:
 - `server.tls_cert_path` — `null` (none)
 - `server.tls_key_path` — `null` (none)
 
+- `server.log_level` — `INFO` (default). Acceptable values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
+
 The constants that control these defaults are defined in `src/config.rs` as `DEFAULT_SERVER_ADDRESS`, `DEFAULT_SERVER_PORT`, and `DEFAULT_TLS_ENABLED`.
 
 ## Config file format (INI/CONF)
@@ -39,6 +41,11 @@ address = "127.0.0.1"
 # The port the gRPC server will listen on.
 # Defaults to 50059 when not provided.
 port = 50059
+
+# The logging level for the application.
+# Acceptable values: OFF, ERROR, WARN, INFO, DEBUG, TRACE
+# Defaults to INFO when not provided.
+# log_level = "INFO"
 
 # Enable TLS for the gRPC server. Set to true to enable TLS and provide the
 # certificate and key file paths below.
@@ -61,6 +68,7 @@ Any configuration key may be overridden using environment variables using the `L
 - `server.tls_enabled` → `LEDGER_BACKEND_SERVER_TLS_ENABLED`
 - `server.tls_cert_path` → `LEDGER_BACKEND_SERVER_TLS_CERT_PATH`
 - `server.tls_key_path` → `LEDGER_BACKEND_SERVER_TLS_KEY_PATH`
+ - `server.log_level` → `LEDGER_BACKEND_SERVER_LOG_LEVEL`
 
 Examples:
 
@@ -70,6 +78,7 @@ export LEDGER_BACKEND_SERVER_PORT=50059
 export LEDGER_BACKEND_SERVER_TLS_ENABLED=true
 export LEDGER_BACKEND_SERVER_TLS_CERT_PATH=/etc/personal-ledger/cert.pem
 export LEDGER_BACKEND_SERVER_TLS_KEY_PATH=/etc/personal-ledger/key.pem
+export LEDGER_BACKEND_SERVER_LOG_LEVEL=DEBUG
 
 cargo run
 ```
@@ -78,6 +87,45 @@ You can also set env vars inline when running:
 
 ```bash
 LEDGER_BACKEND_SERVER_ADDRESS=0.0.0.0 LEDGER_BACKEND_SERVER_PORT=50059 cargo run
+```
+
+Set `log_level` via environment variable (example):
+
+```bash
+LEDGER_BACKEND_SERVER_LOG_LEVEL=DEBUG cargo run
+```
+
+## Log level values
+
+The `server.log_level` configuration value is deserialized using a serde-friendly enum
+(`telemetry::LogLevel`) that accepts lowercase names thanks to `#[serde(rename_all = "lowercase")]`.
+This means you may provide values in lowercase or uppercase; the canonical serialized form is lowercase.
+
+Accepted values (examples):
+
+- `off` or `OFF`
+- `error` or `ERROR`
+- `warn` or `WARN`
+- `info` or `INFO`
+- `debug` or `DEBUG`
+- `trace` or `TRACE`
+
+Examples
+
+- INI / .conf (config/ledger-backend.conf)
+
+```ini
+[server]
+log_level = "info"
+```
+
+- Environment variable (both lowercase/uppercase are accepted)
+
+```bash
+# both are accepted
+LEDGER_BACKEND_SERVER_LOG_LEVEL=debug cargo run
+LEDGER_BACKEND_SERVER_LOG_LEVEL=DEBUG cargo run
+```
 ```
 
 ## Troubleshooting

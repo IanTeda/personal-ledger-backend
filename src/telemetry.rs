@@ -12,6 +12,10 @@
 //! - **Integration**: Seamless integration with the application's main error handling system
 //! - **Convenient Aliases**: Short aliases like `TelemetryLevel` for common types
 //!
+//! ## Actions
+//! 
+//! - [ ] Tidy up log level and add display trait
+//! 
 //! ## Usage
 //!
 //! ### Basic Initialization
@@ -74,6 +78,9 @@ use tracing_log;
 
 use crate::LedgerResult;
 
+// Re-export serde derives for convenience in this module
+use serde::{Deserialize, Serialize};
+
 /// Re-export of tracing::level_filters::LevelFilter for convenience.
 ///
 /// This type alias provides a shorter, more convenient name for the tracing LevelFilter
@@ -91,6 +98,36 @@ use crate::LedgerResult;
 /// tracing::init(level)?;
 /// ```
 pub type TelemetryLevel = tracing::level_filters::LevelFilter;
+
+/// A serde-friendly representation of log levels used in configuration.
+//
+/// The tracing crate's `LevelFilter` type does not implement `serde::{Deserialize, Serialize}`
+/// so we expose a small enum that can be used in configuration files and converted to
+/// the runtime `LevelFilter` when initializing telemetry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    OFF,
+    ERROR,
+    WARN,
+    #[default]
+    INFO,
+    DEBUG,
+    TRACE,
+}
+
+impl From<LogLevel> for tracing::level_filters::LevelFilter {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::OFF => tracing::level_filters::LevelFilter::OFF,
+            LogLevel::ERROR => tracing::level_filters::LevelFilter::ERROR,
+            LogLevel::WARN => tracing::level_filters::LevelFilter::WARN,
+            LogLevel::INFO => tracing::level_filters::LevelFilter::INFO,
+            LogLevel::DEBUG => tracing::level_filters::LevelFilter::DEBUG,
+            LogLevel::TRACE => tracing::level_filters::LevelFilter::TRACE,
+        }
+    }
+}
 
 /// Telemetry-specific error types for logging and tracing operations.
 ///
@@ -185,23 +222,6 @@ impl TelemetryError {
     }
 }
 
-/// Conversion from `TelemetryError` to the application's main error type.
-///
-/// This implementation allows telemetry errors to be seamlessly integrated
-/// with the application's primary error handling system, ensuring consistent
-/// error propagation and handling across the codebase.
-impl From<TelemetryError> for crate::LedgerError {
-    fn from(error: TelemetryError) -> Self {
-        match error {
-            TelemetryError::SubscriberInit(_) => crate::LedgerError::Internal(error.to_string()),
-            TelemetryError::EnvFilter(_) => crate::LedgerError::Configuration(error.to_string()),
-            TelemetryError::LogTracerInit(_) => crate::LedgerError::Internal(error.to_string()),
-            TelemetryError::Io(e) => crate::LedgerError::Io(e),
-            TelemetryError::Config(_) => crate::LedgerError::Configuration(error.to_string()),
-        }
-    }
-}
-
 /// Initializes the telemetry system with the specified log level.
 ///
 /// This function sets up the complete tracing infrastructure including:
@@ -254,13 +274,17 @@ impl From<TelemetryError> for crate::LedgerError {
 /// - `TelemetryError::LogTracerInit` - If log tracer initialization fails
 /// - `TelemetryError::EnvFilter` - If environment filter parsing fails
 pub fn init(
-    tracing_level: TelemetryLevel
+    tracing_level: LogLevel 
 ) -> LedgerResult<()> {
     //-- 1. Filter events
     // Set default log level based on configuration
-    let default_env_filter = EnvFilter::builder()
-        .with_default_directive(tracing_level.into())
-        .from_env_lossy();
+    let default_env_filter = {
+        // Convert our serde-friendly LogLevel -> tracing LevelFilter -> Directive
+        let default_directive = tracing::level_filters::LevelFilter::from(tracing_level).into();
+        EnvFilter::builder()
+            .with_default_directive(default_directive)
+            .from_env_lossy()
+    };
 
     // Try to use env runtime level, if not present use default
     let env_filter = EnvFilter::try_from_default_env()
@@ -334,7 +358,7 @@ mod tests {
         // Test Config error conversion
         let telemetry_err = TelemetryError::config("Test error");
         let ledger_err: crate::LedgerError = telemetry_err.into();
-        assert!(matches!(ledger_err, crate::LedgerError::Configuration(_)));
+        assert!(matches!(ledger_err, crate::LedgerError::Config(_)));
 
         // Test SubscriberInit error conversion
         let telemetry_err = TelemetryError::subscriber_init("Test error");
@@ -344,7 +368,7 @@ mod tests {
         // Test EnvFilter error conversion
         let telemetry_err = TelemetryError::env_filter("Test error");
         let ledger_err: crate::LedgerError = telemetry_err.into();
-        assert!(matches!(ledger_err, crate::LedgerError::Configuration(_)));
+        assert!(matches!(ledger_err, crate::LedgerError::Config(_)));
     }
 
     /// Tests conversion from std::io::Error to TelemetryError and through to LedgerError.
@@ -487,5 +511,31 @@ mod tests {
         // Test that we can use TelemetryLevel in function calls
         // (This would normally call init, but we can't test that easily due to global state)
         let _level_param: TelemetryLevel = TelemetryLevel::DEBUG;
+    }
+
+    /// Ensure the serde-friendly `LogLevel` accepts lowercase values when deserializing.
+    #[test]
+    fn test_log_level_lowercase_deserialize() {
+        // Direct enum deserialization from JSON string
+        let j = "\"info\"";
+        let level: LogLevel = serde_json::from_str(j).expect("should deserialize lowercase 'info'");
+        assert_eq!(level, LogLevel::INFO);
+
+        let j = "\"debug\"";
+        let level: LogLevel = serde_json::from_str(j).expect("should deserialize lowercase 'debug'");
+        assert_eq!(level, LogLevel::DEBUG);
+
+        let j = "\"trace\"";
+        let level: LogLevel = serde_json::from_str(j).expect("should deserialize lowercase 'trace'");
+        assert_eq!(level, LogLevel::TRACE);
+
+        // Deserialize via a small struct to simulate config section
+        #[derive(serde::Deserialize)]
+        struct S {
+            level: LogLevel,
+        }
+
+        let s = serde_json::from_str::<S>("{\"level\":\"warn\"}").expect("struct should deserialize");
+        assert_eq!(s.level, LogLevel::WARN);
     }
 }

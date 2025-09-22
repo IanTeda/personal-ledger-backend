@@ -895,6 +895,7 @@ dependencies = [
  "prost",
  "secrecy",
  "serde",
+ "serde_json",
  "temp-env",
  "thiserror",
  "tokio",

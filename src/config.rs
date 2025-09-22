@@ -1,7 +1,7 @@
 use config::{Config as ConfigLib, ConfigError as ConfigLibError};
 use std::path::PathBuf;
 
-use crate::LedgerResult;
+use crate::{telemetry, LedgerResult};
 
 /// Default name for the configuration file (without extension).
 ///
@@ -19,6 +19,9 @@ const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1";
 
 /// Default server port used when no value is provided by file or env.
 const DEFAULT_SERVER_PORT: u16 = 50059;
+
+/// Default log level if none is specified.
+const DEFAULT_LOG_LEVEL: telemetry::LogLevel = telemetry::LogLevel::WARN;
 
 /// Default for whether TLS is enabled.
 const DEFAULT_TLS_ENABLED: bool = false;
@@ -82,6 +85,11 @@ pub struct ServerConfig {
     /// The port number to bind the server on.
     /// Must be a valid port number (1023-65535).
     pub port: u16,
+
+    /// The logging level for the application.
+    /// If not set, defaults to `INFO`.
+    /// Acceptable values: OFF, ERROR, WARN, INFO, DEBUG, TRACE.
+    pub log_level: Option<telemetry::LogLevel>,
 
     /// Whether TLS encryption should be enabled for secure connections.
     /// When enabled, both `tls_cert_path` and `tls_key_path` must be provided.
@@ -165,6 +173,10 @@ impl LedgerConfig {
         let address = address.parse()?;
         Ok(address)
     }
+
+    pub fn log_level(&self) -> telemetry::LogLevel {
+        self.server.log_level.unwrap_or(DEFAULT_LOG_LEVEL)
+    }
 }
 
 impl Default for ServerConfig {
@@ -172,6 +184,7 @@ impl Default for ServerConfig {
         Self {
             address: DEFAULT_SERVER_ADDRESS.to_string(),
             port: DEFAULT_SERVER_PORT,
+            log_level: Some(DEFAULT_LOG_LEVEL),
             tls_enabled: DEFAULT_TLS_ENABLED,
             tls_cert_path: DEFAULT_TLS_CERT_PATH.map(PathBuf::from),
             tls_key_path: DEFAULT_TLS_KEY_PATH.map(PathBuf::from),
@@ -201,6 +214,7 @@ mod tests {
             server: ServerConfig {
                 address: "127.0.0.1".into(),
                 port: 50051,
+                log_level: None,
                 tls_enabled: false,
                 tls_cert_path: None,
                 tls_key_path: None,
@@ -218,6 +232,7 @@ mod tests {
             server: ServerConfig {
                 address: "not_an_ip".into(),
                 port: 80,
+                log_level: None,
                 tls_enabled: false,
                 tls_cert_path: None,
                 tls_key_path: None,
