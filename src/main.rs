@@ -5,7 +5,7 @@
 /// The server currently implements a simple UtilitiesService with a Ping method to demonstrate functionality.
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_reflection::server as TonicRefelectionServer;
-use personal_ledger_backend::{rpc, telemetry::{self, TelemetryLevel}, LedgerResult};
+use personal_ledger_backend::{rpc, telemetry, LedgerResult};
 
 #[derive(Default)]
 pub struct MyUtilitiesService {}
@@ -30,7 +30,7 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 async fn main() -> LedgerResult<()> {
 
     let config = personal_ledger_backend::LedgerConfig::parse()?;
-    let log_level = config.log_level();
+    let log_level = config.server.log_level();
 
     let _tracing = telemetry::init(log_level);
     tracing::info!("Starting tracing at level '{:?}'", log_level);
@@ -41,7 +41,7 @@ async fn main() -> LedgerResult<()> {
         .build_v1()
         .unwrap();
 
-    let server_address = config.server_address()?;
+    let server_address = config.server.address()?;
     tracing::info!("Starting Tonic server at '{}'", server_address);
 
     let utility_server = MyUtilitiesService::default();

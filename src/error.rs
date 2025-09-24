@@ -62,9 +62,9 @@ pub enum LedgerError {
     #[error("Configuration error: {0}")]
     Config(crate::config::ConfigError),
 
-    /// Errors from database operations
-    // #[error("Database error: {0}")]
-    // Database(#[from] sqlx::Error),
+    /// Database errors from database module
+    #[error("Database error: {0}")]
+    Database(crate::database::DatabaseError),
 
     /// Configuration loading and parsing errors
     // Note: use the structured `Config(crate::config::ConfigError)` variant
@@ -100,6 +100,11 @@ impl LedgerError {
         Self::Config(crate::config::ConfigError::Validation(message.into()))
     }
 
+    /// Creates a new database error
+    pub fn database<S: Into<String>>(message: S) -> Self {
+        Self::Database(crate::database::DatabaseError::Validation(message.into()))
+    }
+
     /// Creates a new validation error
     pub fn validation<S: Into<String>>(message: S) -> Self {
         Self::Validation(message.into())
@@ -124,6 +129,17 @@ impl LedgerError {
 impl From<crate::config::ConfigError> for LedgerError {
     fn from(error: crate::config::ConfigError) -> Self {
         LedgerError::Config(error)
+    }
+}
+
+/// Convert database errors into the central `LedgerError` enum.
+///
+/// This allows propagation of structured `DatabaseError` values into the
+/// central `LedgerError` enum so they can be logged and translated to
+/// gRPC statuses in a single place.
+impl From<crate::database::DatabaseError> for LedgerError {
+    fn from(error: crate::database::DatabaseError) -> Self {
+        LedgerError::Database(error)
     }
 }
 
@@ -153,12 +169,10 @@ impl From<LedgerError> for tonic::Status {
                 tracing::error!(?e, "Tonic transport error");
                 tonic::Status::internal("Transport error occurred")
             }
-            // Error::Database(sqlx::Error::RowNotFound) => {
-            //     tonic::Status::not_found("Resource not found")
-            // }
-            // Error::Database(_) => {
-            //     tonic::Status::internal("Database error occurred")
-            // }
+            LedgerError::Database(e) => {
+                tracing::error!(?e, "Database error");
+                tonic::Status::internal("Database error")
+            }
             LedgerError::Config(e) => {
                 // Log structured config errors and return a generic client-facing message
                 tracing::error!(?e, "Configuration error");
@@ -446,11 +460,40 @@ mod tests {
         assert!(err.to_string().contains("内部服务器错误"));
     }
 
-    // #[test]
-    // fn test_sqlx_error_conversion() {
-    //     let sqlx_err = sqlx::Error::RowNotFound;
-    //     let app_err: Error = sqlx_err.into();
-    //     let status: tonic::Status = app_err.into();
-    //     assert_eq!(status.code(), tonic::Code::NotFound);
-    // }
+    #[test]
+    fn test_sqlx_database_error_conversion() {
+        // sqlx::Error::RowNotFound is a common sqlx error we can construct
+        let sqlx_err = sqlx::Error::RowNotFound;
+
+        // Convert to the module's DatabaseError
+        let db_err: crate::database::DatabaseError = sqlx_err.into();
+        // Convert to LedgerError
+        let ledger_err: LedgerError = db_err.into();
+
+        // Ensure it matches the Database variant
+        assert!(matches!(ledger_err, LedgerError::Database(_)));
+    }
+
+    #[test]
+    fn test_database_error_to_status() {
+        let sqlx_err = sqlx::Error::RowNotFound;
+        let db_err: crate::database::DatabaseError = sqlx_err.into();
+        let ledger_err: LedgerError = db_err.into();
+        let status: tonic::Status = ledger_err.into();
+
+        // We currently map Database errors to internal server errors for clients
+        assert_eq!(status.code(), tonic::Code::Internal);
+        assert!(status.message().contains("Database"));
+    }
+
+    #[test]
+    fn test_sqlx_error_conversion() {
+        let sqlx_err = sqlx::Error::RowNotFound;
+        // Convert sqlx::Error into our DatabaseError and then into the central LedgerError
+        let db_err: crate::database::DatabaseError = sqlx_err.into();
+        let app_err: LedgerError = db_err.into();
+        let status: tonic::Status = app_err.into();
+        // Database errors are mapped to internal server errors for clients
+        assert_eq!(status.code(), tonic::Code::Internal);
+    }
 }

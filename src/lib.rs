@@ -13,6 +13,8 @@
 //! - [`tracing`]: Comprehensive logging and tracing functionality.
 //! - [`config`]: Configuration loading and management.
 //!
+
+pub mod database;
 mod error;
 pub mod config;
 pub mod rpc;
