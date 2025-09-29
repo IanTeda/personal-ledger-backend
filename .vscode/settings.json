@@ -12,11 +12,18 @@
   },
   "sqltools.connections": [
     {
+      "name": "SQLite",
+      "driver": "SQLite",
+      "database": "./.personal-ledger-dev.db",
+      "connectionTimeout": 15
+    },
+    {
+      "ssh": "Disabled",
       "previewLimit": 50,
-      "server": "localhost",
+      "name": "PostgreSQL",
+      "server": "127.0.0.1",
       "driver": "PostgreSQL",
-      "name": "Backend",
-      "connectString": "postgrespostgres://postgres:postgres@localhost:5432/"
+      "connectString": "postgres://postgres@localhost:5432/personal-ledger-dev"
     }
   ],
   "todo-tree.general.tags": [
@@ -39,5 +46,16 @@
         "ghcr.io/microsoft/mcp-dotnet-samples/awesome-copilot:latest"
       ]
     }
-  }
+  },
+  "todo-tree.general.tagGroups": {},
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/*/**",
+    "**/.github/*/**"
+  ],
+  "todo-tree.filtering.scopes": [],
+  "pgsql.connections": [
+    
+  ],
+  "sqltools.useNodeRuntime": true,
+  "sqlite.sqlite3": "/usr/bin/sqlite3"
 }
