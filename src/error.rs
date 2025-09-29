@@ -50,6 +50,10 @@ pub type LedgerResult<T> = std::result::Result<T, LedgerError>;
 /// ```
 #[derive(thiserror::Error, Debug)]
 pub enum LedgerError {
+    /// For starter, to remove as code matures.
+    #[error("Generic error: {0}")]
+    Generic(String),
+
     /// Errors related to gRPC communication and Tonic framework
     #[error("gRPC error: {0}")]
     Grpc(#[from] tonic::Status),
@@ -80,6 +84,10 @@ pub enum LedgerError {
     /// Network address parsing errors
     #[error("Address parsing error: {0}")]
     AddrParse(#[from] std::net::AddrParseError),
+
+    /// Environment variable errors
+    #[error("Environment variable error: {0}")]
+    Env(#[from] std::env::VarError),
 
     /// Data validation errors
     #[error("Validation error: {0}")]
@@ -118,6 +126,11 @@ impl LedgerError {
     /// Creates a new internal error
     pub fn internal<S: Into<String>>(message: S) -> Self {
         Self::Internal(message.into())
+    }
+
+    /// Creates a new generic error
+    pub fn generic<S: Into<String>>(message: S) -> Self {
+        Self::Generic(message.into())
     }
 }
 
@@ -165,6 +178,11 @@ impl From<LedgerError> for tonic::Status {
     fn from(error: LedgerError) -> Self {
         match error {
             LedgerError::Grpc(status) => status,
+            LedgerError::Generic(msg) => {
+                // Generic errors are internal by nature; log details for operators and return a safe message to clients.
+                tracing::error!(%msg, "Generic error");
+                tonic::Status::internal("Internal server error")
+            }
             LedgerError::TonicTransport(e) => {
                 tracing::error!(?e, "Tonic transport error");
                 tonic::Status::internal("Transport error occurred")
@@ -184,6 +202,10 @@ impl From<LedgerError> for tonic::Status {
             }
             LedgerError::AddrParse(_) => {
                 tonic::Status::invalid_argument("Invalid network address format")
+            }
+            LedgerError::Env(e) => {
+                tracing::error!(?e, "Environment variable error");
+                tonic::Status::internal("Environment configuration error")
             }
             LedgerError::Validation(msg) => {
                 tonic::Status::invalid_argument(msg)
@@ -218,6 +240,9 @@ mod tests {
 
         let internal_err = LedgerError::internal("Something went wrong");
         assert!(matches!(internal_err, LedgerError::Internal(_)));
+
+        let generic_err = LedgerError::generic("Generic error");
+        assert!(matches!(generic_err, LedgerError::Generic(_)));
     }
 
     #[test]
@@ -233,6 +258,10 @@ mod tests {
         // Test with empty string
         let err3 = LedgerError::internal("");
         assert!(matches!(err3, LedgerError::Internal(_)));
+
+        // Test with String for generic
+        let err4 = LedgerError::generic("test message".to_string());
+        assert!(matches!(err4, LedgerError::Generic(_)));
     }
 
     #[test]
@@ -260,6 +289,13 @@ mod tests {
             assert!(matches!(ledger_err, LedgerError::AddrParse(_)));
         }
 
+        // Test Env variant by trying to get a non-existent env var
+        let env_result = std::env::var("NON_EXISTENT_VAR");
+        if let Err(env_err) = env_result {
+            let ledger_err: LedgerError = env_err.into();
+            assert!(matches!(ledger_err, LedgerError::Env(_)));
+        }
+
         let validation_err = LedgerError::Validation("test".to_string());
         assert!(matches!(validation_err, LedgerError::Validation(_)));
 
@@ -268,6 +304,9 @@ mod tests {
 
         let internal_err = LedgerError::Internal("test".to_string());
         assert!(matches!(internal_err, LedgerError::Internal(_)));
+
+        let generic_err = LedgerError::Generic("test".to_string());
+        assert!(matches!(generic_err, LedgerError::Generic(_)));
     }
 
     #[test]
@@ -283,6 +322,9 @@ mod tests {
 
         let internal_err = LedgerError::internal("Test internal error");
         assert_eq!(format!("{}", internal_err), "Internal error: Test internal error");
+
+        let generic_err = LedgerError::generic("Test generic error");
+        assert_eq!(format!("{}", generic_err), "Generic error: Test generic error");
     }
 
     #[test]
@@ -347,9 +389,24 @@ mod tests {
             assert!(status.message().contains("Invalid network address format"));
         }
 
+        // Test Env variant
+        let env_result = std::env::var("NON_EXISTENT_VAR");
+        if let Err(env_err) = env_result {
+            let ledger_err: LedgerError = env_err.into();
+            let status: Status = ledger_err.into();
+            assert_eq!(status.code(), Code::Internal);
+            assert!(status.message().contains("Environment configuration error"));
+        }
+
         // Test Internal variant
         let internal_err = LedgerError::Internal("Internal error".to_string());
         let status: Status = internal_err.into();
+        assert_eq!(status.code(), Code::Internal);
+        assert!(status.message().contains("Internal server error"));
+
+        // Test Generic variant
+        let generic_err = LedgerError::Generic("Generic error".to_string());
+        let status: Status = generic_err.into();
         assert_eq!(status.code(), Code::Internal);
         assert!(status.message().contains("Internal server error"));
     }
