@@ -40,3 +40,48 @@ args = ["serve", "--port", "8001"]
 [tasks.submodules]
 command = "git"
 args = ["submodule", "update", "--recursive", "--remote"]
+
+
+# -------------------------------[DATABASE]------------------------------------
+## Drop Database
+## $ sqlx database drop
+## $ cargo make db_drop
+[tasks.db-drop]
+install_crate = "sqlx-cli"
+command = "sqlx"
+args = ["database", "drop", "-y"]
+
+## Create Database
+## $ sqlx database create
+[tasks.db-create]
+install_crate = "sqlx-cli"
+command = "sqlx"
+args = ["database", "create"]
+
+## Migrate database
+## $ sqlx migrate run
+[tasks.db-migrate]
+install_crate = "sqlx-cli"
+command = "sqlx"
+args = ["migrate", "run"]
+
+[tasks.db-prepare]
+install_crate = "sqlx-cli"
+command = "cargo"
+args = ["sqlx", "prepare", "--check"]
+
+[tasks.db-prepare-generate]
+install_crate = "sqlx-cli"
+command = "cargo"
+args = ["sqlx", "prepare"]
+
+# Run Database tasks. You need to exit vscode before running as vscode has an open connection to the database.
+# $ cargo make db
+[tasks.db]
+dependencies = [
+    "db-drop",
+    "db-create",
+    "db-migrate",
+    "db-prepare-generate",
+    "db-prepare",
+]

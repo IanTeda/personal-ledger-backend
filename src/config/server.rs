@@ -33,6 +33,8 @@ pub const DEFAULT_TLS_CERT_PATH: Option<&str> = None;
 /// Defaults for TLS key path (none by default).
 pub const DEFAULT_TLS_KEY_PATH: Option<&str> = None;
 
+/// Default data directory for storing application files (none by default).
+pub const DEFAULT_DATA_DIR: Option<&str> = Some("data/");
 
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -49,6 +51,12 @@ pub struct ServerConfig {
     /// The port number to bind the server on.
     /// Must be a valid port number (1023-65535).
     pub port: u16,
+
+    /// Optional data directory path used by the application to store state
+    /// or other files. When `None` the application will use a sensible
+    /// platform-specific default (or the current working directory) as
+    /// configured at runtime.
+    pub data_dir: Option<PathBuf>,
 
     /// The logging level for the application.
     ///
@@ -74,6 +82,7 @@ impl Default for ServerConfig {
         Self {
             address: DEFAULT_SERVER_ADDRESS.to_string(),
             port: DEFAULT_SERVER_PORT,
+            data_dir: DEFAULT_DATA_DIR.map(PathBuf::from),
             log_level: Some(DEFAULT_LOG_LEVEL),
             tls_enabled: DEFAULT_TLS_ENABLED,
             tls_cert_path: DEFAULT_TLS_CERT_PATH.map(PathBuf::from),
@@ -125,6 +134,7 @@ mod tests {
             tls_enabled: false,
             tls_cert_path: None,
             tls_key_path: None,
+            data_dir: None,
         };
 
         let addr = cfg.address().expect("address should parse");
@@ -141,6 +151,7 @@ mod tests {
             tls_enabled: false,
             tls_cert_path: None,
             tls_key_path: None,
+            data_dir: None,
         };
 
         assert!(cfg.address().is_err(), "invalid address should return an error");

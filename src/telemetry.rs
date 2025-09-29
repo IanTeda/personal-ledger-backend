@@ -79,7 +79,7 @@ use tracing_log;
 use crate::LedgerResult;
 
 // Re-export serde derives for convenience in this module
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, de};
 
 /// Re-export of tracing::level_filters::LevelFilter for convenience.
 ///
@@ -104,8 +104,7 @@ pub type TelemetryLevel = tracing::level_filters::LevelFilter;
 /// The tracing crate's `LevelFilter` type does not implement `serde::{Deserialize, Serialize}`
 /// so we expose a small enum that can be used in configuration files and converted to
 /// the runtime `LevelFilter` when initializing telemetry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 pub enum LogLevel {
     OFF,
     ERROR,
@@ -114,6 +113,25 @@ pub enum LogLevel {
     INFO,
     DEBUG,
     TRACE,
+}
+
+
+impl<'de> de::Deserialize<'de> for LogLevel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "off" => Ok(LogLevel::OFF),
+            "error" => Ok(LogLevel::ERROR),
+            "warn" | "warning" => Ok(LogLevel::WARN),
+            "info" => Ok(LogLevel::INFO),
+            "debug" => Ok(LogLevel::DEBUG),
+            "trace" => Ok(LogLevel::TRACE),
+            other => Err(de::Error::unknown_variant(other, &["off", "error", "warn", "info", "debug", "trace"])),
+        }
+    }
 }
 
 impl From<LogLevel> for tracing::level_filters::LevelFilter {

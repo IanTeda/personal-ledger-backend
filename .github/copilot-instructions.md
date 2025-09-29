@@ -38,7 +38,7 @@ This repository is following the principals of [Zero to Production](https://gith
 ## Frameworks
 
   - [tonic](https://github.com/hyperium/tonic)
-  - [sqlx (Postgres)](https://github.com/launchbadge/sqlx)
+  - [sqlx (SQLite and Postgres)](https://github.com/launchbadge/sqlx)
   - [chrono](https://docs.rs/chrono/latest/chrono/)
   - [serde](https://serde.rs/)
   - jsonwebtoken

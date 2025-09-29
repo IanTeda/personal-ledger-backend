@@ -19,6 +19,13 @@ The devcontainer for this project is based on the official Rust image and includ
 - **VS Code extensions** for Rust, Docker, Markdown, SQL, YAML, and Protocol Buffers
 - **Port forwarding** for mdBook documentation server (port 8001)
 - **Pre-configured environment** for code formatting, linting, and testing
+- **sqlx-cli** tooling
+- **SQLite** application
+- **PostgreSQL 18** server 
+- **Docker CLI** for running containers inside the devcontainer
+- **Node/npm** that used for some dev helpers**
+- Helpful VS Code **extensions** and workspace **settings** (see `.devcontainer/devcontainer.json`)
+
 
 ### How to Use the Devcontainer
 
@@ -37,4 +44,21 @@ VS Code will build the container image, install all dependencies, and set up the
 - The container includes everything needed for Rust, gRPC, and documentation workflows.
 
 5. **Serving Documentation**  
-To serve the project documentation locally (mdBook), run:
+   To serve the project documentation locally (mdBook), run:
+   ```bash
+   mdbook serve --port 800
+
+### Postgres Usage
+
+Postgres notes and how to verify
+- The feature installs a Postgres server inside the container on port 5432 and sets environment variables such as:
+  - PGUSER=postgres, PGHOST=localhost, PGDATA=/var/lib/postgresql/data
+- The container uses the `service` command (not systemd) to start Postgres in the `postStartCommand`.
+- Verify readiness:
+  - pg_isready -U postgres -d postgres
+  - psql -U postgres -d postgres -c "SELECT version();"
+- If you encounter "database files are incompatible" (data directory initialised by a different major version), you can reinitialise the data directory so Postgres 18 creates a fresh cluster:
+  - WARNING: destructive — this deletes existing DB data in the container.
+  - sudo rm -rf /var/lib/postgresql/data
+  - sudo -u postgres /usr/lib/postgresql/18/bin/initdb -D /var/lib/postgresql/data
+  - Then start Postgres: sudo service postgresql start

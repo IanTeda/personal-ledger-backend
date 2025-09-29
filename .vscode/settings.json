@@ -10,6 +10,8 @@
       "--proto_path=${workspaceRoot}/proto"
     ]
   },
+  "sqltools.useConnectionStorage": "workspace",
+  "sqltools.useNodeRuntime": true,
   "sqltools.connections": [
     {
       "name": "SQLite",
@@ -26,6 +28,7 @@
       "connectString": "postgres://postgres@localhost:5432/personal-ledger-dev"
     }
   ],
+  "sqlite.sqlite3": "/usr/bin/sqlite3",
   "todo-tree.general.tags": [
     "BUG",
     "HACK",
@@ -53,9 +56,4 @@
     "**/.github/*/**"
   ],
   "todo-tree.filtering.scopes": [],
-  "pgsql.connections": [
-    
-  ],
-  "sqltools.useNodeRuntime": true,
-  "sqlite.sqlite3": "/usr/bin/sqlite3"
 }
