@@ -128,9 +128,13 @@ mod tests {
                 .unwrap()
                 .set_default("server.port", defaults.server.port)
                 .unwrap()
+                .set_default("server.data_dir", defaults.server.data_dir.as_ref().map(|p| p.to_string_lossy().to_string()))
+                .unwrap()
                 .set_default("server.tls_enabled", defaults.server.tls_enabled)
                 .unwrap()
                 .set_default("database.kind", defaults.database.kind.to_string())
+                .unwrap()
+                .set_default("database.database", defaults.database.database.clone())
                 .unwrap()
                 .add_source(
                     config::Environment::with_prefix(ENV_SUFFIX)

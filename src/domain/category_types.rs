@@ -52,7 +52,7 @@ pub enum CategoryTypes {
     /// Money spent or costs incurred (groceries, utilities, entertainment).
     #[default]
     Expense,
-    
+
     /// Owner's residual interest in assets after deducting liabilities.
     Equity,
 }
@@ -229,6 +229,29 @@ impl CategoryTypes {
     /// ```
     pub fn is_income_statement(&self) -> bool {
         matches!(self, CategoryTypes::Income | CategoryTypes::Expense)
+    }
+
+    /// Create a random CategoryTypes variant for testing.
+    ///
+    /// This method randomly selects one of the five category types using
+    /// the `fake` crate, useful for generating test data and mock objects.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use personal_ledger_backend::domain::CategoryTypes;
+    ///
+    /// let random_type = CategoryTypes::mock();
+    /// // random_type will be one of: Asset, Liability, Income, Expense, or Equity
+    /// ```
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        use fake::Fake;
+
+        // Get all category types and randomly select one
+        let all_types = Self::all();
+        let random_index: usize = (0..all_types.len()).fake();
+        all_types[random_index].clone()
     }
 }
 
@@ -446,5 +469,21 @@ mod tests {
         let debug_str = format!("{:?}", error);
         assert!(debug_str.contains("InvalidCategoryType"));
         assert!(debug_str.contains("test"));
+    }
+
+    #[test]
+    fn test_mock() {
+        // Test that mock() returns valid CategoryTypes
+        let mock_type = CategoryTypes::mock();
+        
+        // Should be one of the valid variants
+        let all_types = CategoryTypes::all();
+        assert!(all_types.contains(&mock_type));
+        
+        // Should have a valid string representation
+        assert!(!mock_type.as_str().is_empty());
+        
+        // Should be parseable back from its string representation
+        assert_eq!(CategoryTypes::from_str(mock_type.as_str()), Ok(mock_type));
     }
 }

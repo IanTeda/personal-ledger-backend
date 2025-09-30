@@ -47,15 +47,20 @@ pub async fn connect(
     let pool = config.database.connection_pool()
         .await.map_err(|e| DatabaseError::Connection(e.to_string()))?;
 
-    // Run migrations on the appropriate pool
+    // TODO: Add Display to Connection pool so we can trace the database type connected to
+    tracing::info!("Database connection established");
+
+    // Run migrations on the appropriate database pool
     // Each database engine has its own migration runner because each database engine
     // has unique SQL dialects and migration requirements.
     match &pool {
         ConnectionPool::Sqlite(p) => {
             sqlx::migrate!("./migrations").run(p).await?;
+            tracing::info!("SQLite datbase migration complete.");
         }
         ConnectionPool::Postgres(p) => {
             sqlx::migrate!("./migrations").run(p).await?;
+            tracing::info!("Postgres datbase migration complete.");
         }
     }
 
