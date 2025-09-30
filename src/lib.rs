@@ -25,6 +25,9 @@ pub use config::LedgerConfig;
 /// Database configuration and helpers.
 pub mod database;
 
+/// Domain models and business logic.
+pub mod domain;
+
 /// Error types and handling utilities.
 mod error;
 
