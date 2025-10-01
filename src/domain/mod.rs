@@ -33,3 +33,6 @@ pub use row_id::RowID;
 /// and organise financial transactions in the personal ledger.
 mod category_types;
 pub use category_types::CategoryTypes;
+
+mod url_slug;
+pub use url_slug::UrlSlug;
