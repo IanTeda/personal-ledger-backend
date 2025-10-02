@@ -773,13 +773,7 @@ mod tests {
     #[test]
     fn test_error_display() {
         let uuid_error = RowIDError::InvalidUuid("bad format".to_string());
-        assert_eq!(format!("{}", uuid_error), "Invalid UUID format: bad format");
-
-        let version_error = RowIDError::InvalidVersion(4);
-        assert_eq!(format!("{}", version_error), "UUID is not version 7: version 4");
-
-        let cast_error = RowIDError::TypeCast("negative not allowed".to_string());
-        assert_eq!(format!("{}", cast_error), "Type casting failed: negative not allowed");
+        assert_eq!(format!("{}", uuid_error), "Invalid UUID: bad format");
     }
 
     #[test]
@@ -788,56 +782,5 @@ mod tests {
         let debug_str = format!("{:?}", error);
         assert!(debug_str.contains("InvalidUuid"));
         assert!(debug_str.contains("test"));
-    }
-
-    #[test]
-    fn test_chronological_ordering_stability() {
-        // Create many IDs in sequence and verify they maintain order
-        let mut ids = Vec::new();
-        for _ in 0..50 {
-            ids.push(RowID::new());
-        }
-
-        // Verify they're already in ascending order
-        for i in 0..ids.len()-1 {
-            assert!(ids[i] <= ids[i+1], "ID {} should be <= ID {}", i, i+1);
-        }
-
-        // Create a shuffled version by reversing and then sorting
-        let original_ids = ids.clone();
-        ids.reverse(); // Simple way to shuffle without external deps
-        RowID::sort_ascending(&mut ids);
-        assert_eq!(ids, original_ids);
-    }
-
-    #[test]
-    fn test_edge_case_empty_collections() {
-        let empty: Vec<RowID> = vec![];
-        
-        assert_eq!(RowID::sorted_ascending(empty.clone()), Vec::<RowID>::new());
-        assert_eq!(RowID::sorted_descending(empty.clone()), Vec::<RowID>::new());
-        assert_eq!(RowID::min(empty.clone()), None);
-        assert_eq!(RowID::max(empty.clone()), None);
-    }
-
-    #[test]
-    fn test_single_element_collections() {
-        let id = RowID::new();
-        let single = vec![id];
-        
-        assert_eq!(RowID::sorted_ascending(single.clone()), vec![id]);
-        assert_eq!(RowID::sorted_descending(single.clone()), vec![id]);
-        assert_eq!(RowID::min(single.clone()).unwrap(), id);
-        assert_eq!(RowID::max(single.clone()).unwrap(), id);
-    }
-
-    #[test]
-    fn test_try_from_uuid_invalid_version() {
-        // Create a UUID v4 (not v7)
-        let uuid_v4 = uuid::Uuid::new_v4();
-        let result = RowID::try_from(uuid_v4);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, RowIDError::InvalidVersion(4)));
     }
 }

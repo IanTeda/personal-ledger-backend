@@ -1,73 +1,57 @@
+use crate::{config::{ConnectionPool, DbEngine}, database::{Category, DatabaseError}};
 
-/// Input for creating a new category.
-///
-/// Contains all the fields needed to create a category, with sensible defaults
-/// for optional fields and automatic generation of timestamps and ID.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewCategory {
-    pub code: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub slug: Option<String>,
-    pub category_type: domain::CategoryTypes,
-    pub color: Option<String>,
-    pub icon: Option<String>,
-    pub is_active: Option<bool>,
-}
+impl Category {
 
+    pub async fn insert(
+        &self,
+        database: ConnectionPool,
+    ) -> Result<Self, DatabaseError> {
+        match database.kind {
+            DbEngine::Postgres => {
+                // Use runtime-checked query for Postgres and RETURNING to get the created record
+                let record = sqlx::query_as::<_, Category>(
+                    r#"
+                    INSERT INTO categories (name, color, slug)
+                    VALUES ($1, $2, $3)
+                    RETURNING id, name, color, slug
+                    "#
+                )
+                .bind(&self.name)
+                .bind(&self.color)
+                .bind(&self.slug)
+                .fetch_one(&database.pool)
+                .await?;
+                Ok(record)
+            }
+            DbEngine::Sqlite => {
+                // SQLite does not reliably support RETURNING across all versions; insert then fetch last id
+                sqlx::query(
+                    r#"
+                    INSERT INTO categories (name, color, slug)
+                    VALUES (?, ?, ?)
+                    "#
+                )
+                .bind(&self.name)
+                .bind(&self.color)
+                .bind(&self.slug)
+                .execute(&database.pool)
+                .await?;
 
-impl NewCategory {
-    /// Create a NewCategory from the minimal required fields.
-    ///
-    /// Validates the category type against allowed values.
-    pub fn new(code: String, name: String, category_type: String) -> Result<Self, String> {
-        // Validate and parse category type
-        let parsed_category_type = domain::CategoryTypes::from_str(&category_type)
-            .map_err(|e| format!("Invalid category type '{}': {}", category_type, e))?;
+                // last_insert_rowid() returns an i64 for the row id
+                let id: i64 = sqlx::query_scalar("SELECT last_insert_rowid()")
+                    .fetch_one(&database.pool)
+                    .await?;
 
-        Ok(Self {
-            code,
-            name,
-            category_type: parsed_category_type,
-            description: None,
-            slug: None,
-            color: None,
-            icon: None,
-            is_active: Some(true),
-        })
-    }
-
-    /// Set optional description.
-    pub fn with_description(mut self, description: String) -> Self {
-        self.description = Some(description);
-        self
-    }
-
-    /// Set optional slug.
-    pub fn with_slug(mut self, slug: String) -> Self {
-        self.slug = Some(slug);
-        self
-    }
-
-    /// Set optional color (validates hex format).
-    pub fn with_color(mut self, color: String) -> Result<Self, String> {
-        if color.len() == 7 && color.starts_with('#') {
-            self.color = Some(color);
-            Ok(self)
-        } else {
-            Err("Color must be in hex format (#RRGGBB)".to_string())
+                let record = sqlx::query_as::<_, Category>(
+                    r#"
+                    SELECT id, name, color, slug FROM categories WHERE id = ?
+                    "#
+                )
+                .bind(id)
+                .fetch_one(&database.pool)
+                .await?;
+                Ok(record)
+            }
         }
-    }
-
-    /// Set optional icon.
-    pub fn with_icon(mut self, icon: String) -> Self {
-        self.icon = Some(icon);
-        self
-    }
-
-    /// Set active status.
-    pub fn with_active_status(mut self, is_active: bool) -> Self {
-        self.is_active = Some(is_active);
-        self
     }
 }

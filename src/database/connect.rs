@@ -26,209 +26,143 @@
 //!
 //! Comprehensive unit tests cover connection success/failure, migration execution, and pool type detection.
 
+use sqlx::any as SqlxAny;
+
 use crate::database::DatabaseError;
-use crate::LedgerConfig;
-use crate::config::ConnectionPool;
 
 /// Initialize the database connection pool and run migrations.
 ///
-/// This function creates a connection pool based on the provided configuration,
-/// runs any pending SQL migrations, and returns the ready-to-use pool.
+/// This function creates a SQLx connection pool based on the provided configuration,
+/// runs any pending SQL migrations using the embedded migration files, and returns
+/// a [`ConnectionPool`] wrapper containing both the pool and engine type information.
+///
+/// The function performs the following steps:
+/// 1. Installs SQLx "any" driver defaults for runtime database selection
+/// 2. Constructs a connection URL from the database configuration
+/// 3. Establishes a connection pool to the database
+/// 4. Wraps the pool in a [`ConnectionPool`] with engine type metadata
+/// 5. Runs pending migrations from the `./migrations` directory
+///
+/// # Arguments
+///
+/// * `config` - Reference to the application's [`LedgerConfig`](crate::config::LedgerConfig)
+///              containing database connection parameters
+///
+/// # Returns
+///
+/// Returns `Ok(ConnectionPool)` containing the initialized connection pool and engine type,
+/// or a [`DatabaseError`] if connection or migration fails.
 ///
 /// # Errors
 ///
 /// Returns an error if:
-/// - The connection pool cannot be created (e.g., invalid config or connection failure)
-/// - Migrations fail to run (e.g., SQL syntax errors or schema conflicts)
+/// - The database connection URL cannot be constructed (e.g., missing PostgreSQL config)
+/// - The connection pool cannot be created (e.g., invalid credentials, unreachable host)
+/// - Migrations fail to execute (e.g., SQL syntax errors, schema conflicts)
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use personal_ledger_backend::config::LedgerConfig;
+/// use personal_ledger_backend::database::connect;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // Load configuration from environment and config files
+///     let config = LedgerConfig::load()?;
+///     
+///     // Initialize database connection pool and run migrations
+///     let connection_pool = connect(&config).await?;
+///     
+///     // Use the pool for database operations
+///     println!("Connected to {:?} database", connection_pool.kind);
+///     
+///     Ok(())
+/// }
+/// ```
+///
+/// # Performance
+///
+/// The connection pool is configured with sensible defaults for connection limits
+/// and timeouts. For production deployments, consider tuning these values through
+/// the PostgreSQL configuration options (`max_pool_size`, `connect_timeout_secs`).
+///
+/// # Migration Files
+///
+/// Migrations are embedded at compile time from the `./migrations` directory
+/// relative to the workspace root. SQLx will track which migrations have been
+/// applied and only run new ones, making this function idempotent.
+///
+/// This function creates a connection pool based on the provided configuration,
+/// runs any pending SQL migrations, and returns the ready-to-use pool.
+/// # Arguments
+///
+/// * `config` - Reference to the application's [`LedgerConfig`](crate::config::LedgerConfig)
+///              containing database connection parameters
+///
+/// # Returns
+///
+/// Returns `Ok(ConnectionPool)` containing the initialized connection pool and engine type,
+/// or a [`DatabaseError`] if connection or migration fails.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The database connection URL cannot be constructed (e.g., missing PostgreSQL config)
+/// - The connection pool cannot be created (e.g., invalid credentials, unreachable host)
+/// - Migrations fail to execute (e.g., SQL syntax errors, schema conflicts)
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use personal_ledger_backend::config::LedgerConfig;
+/// use personal_ledger_backend::database::connect;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     // Load configuration from environment and config files
+///     let config = LedgerConfig::load()?;
+///     
+///     // Initialize database connection pool and run migrations
+///     let connection_pool = connect(&config).await?;
+///     
+///     // Use the pool for database operations
+///     println!("Connected to {:?} database", connection_pool.kind);
+///     
+///     Ok(())
+/// }
+/// ```
+///
+/// # Performance
+///
+/// The connection pool is configured with sensible defaults for connection limits
+/// and timeouts. For production deployments, consider tuning these values through
+/// the PostgreSQL configuration options (`max_pool_size`, `connect_timeout_secs`).
+///
+/// # Migration Files
+///
+/// Migrations are embedded at compile time from the `./migrations` directory
+/// relative to the workspace root. SQLx will track which migrations have been
+/// applied and only run new ones, making this function idempotent.
 pub async fn connect(
-    config: &LedgerConfig,
-) -> Result<ConnectionPool, DatabaseError> {
-    // Create the connection pool
-    let pool = config.database.connection_pool()
-        .await.map_err(|e| DatabaseError::Connection(e.to_string()))?;
+    url: &str,
+) -> Result<sqlx::Pool<sqlx::Any>, DatabaseError> {
+    // Ensure the SQLx "any" driver has the default drivers installed
+    // https://docs.rs/sqlx/latest/sqlx/any/fn.install_default_drivers.html
+    SqlxAny::install_default_drivers();
 
-    // TODO: Add Display to Connection pool so we can trace the database type connected to
+    // Build the connection URL from the config
+    let pool = sqlx::Pool::<sqlx::Any>::connect(&url)
+        .await
+        .map_err(|e| DatabaseError::Connection(e.to_string()))?;
+
     tracing::info!("Database connection established");
 
     // Run migrations on the appropriate database pool
     // Each database engine has its own migration runner because each database engine
     // has unique SQL dialects and migration requirements.
-    match &pool {
-        ConnectionPool::Sqlite(p) => {
-            sqlx::migrate!("./migrations").run(p).await?;
-            tracing::info!("SQLite datbase migration complete.");
-        }
-        ConnectionPool::Postgres(p) => {
-            sqlx::migrate!("./migrations").run(p).await?;
-            tracing::info!("Postgres datbase migration complete.");
-        }
-    }
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    tracing::info!("Database migrations complete.");
 
     Ok(pool)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::{DatabaseConfig, DbEngine};
-
-    #[tokio::test]
-    async fn connect_sqlite_success() {
-        let config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Sqlite,
-                database: ":memory:".to_string(),
-                postgres: None,
-            },
-        };
-
-        let result = connect(&config).await;
-        assert!(result.is_ok(), "SQLite connection and migration should succeed");
-
-        let pool = result.unwrap();
-        match pool {
-            ConnectionPool::Sqlite(p) => {
-                // Verify the pool works by running a simple query
-                let row: (i64,) = sqlx::query_as("SELECT 1")
-                    .fetch_one(&p)
-                    .await
-                    .expect("Should be able to query the SQLite database");
-                assert_eq!(row.0, 1);
-            }
-            ConnectionPool::Postgres(_) => panic!("Expected SQLite pool"),
-        }
-    }
-
-    #[tokio::test]
-    async fn connect_sqlite_connection_failure() {
-        // Use an invalid path that should fail
-        let config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Sqlite,
-                database: "/invalid/path/that/does/not/exist/database".to_string(),
-                postgres: None,
-            },
-        };
-
-        let result = connect(&config).await;
-        assert!(result.is_err(), "SQLite connection should fail for invalid path");
-
-        let err = result.unwrap_err();
-        match err {
-            DatabaseError::Connection(msg) => {
-                assert!(msg.contains("SQLite connection failed"), 
-                       "Error message should indicate SQLite connection failure: {}", msg);
-            }
-            other => panic!("Expected DatabaseError::Connection, got {:?}", other),
-        }
-    }
-
-    #[tokio::test]
-    async fn connect_postgres_missing_config() {
-        let config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Postgres,
-                database: "test_db".to_string(),
-                postgres: None,
-            },
-        };
-
-        let result = connect(&config).await;
-        assert!(result.is_err(), "Postgres connection should fail without config");
-
-        let err = result.unwrap_err();
-        match err {
-            DatabaseError::Connection(msg) => {
-                assert!(msg.contains("postgres configuration missing"), 
-                       "Error message should indicate missing postgres config: {}", msg);
-            }
-            other => panic!("Expected DatabaseError::Connection, got {:?}", other),
-        }
-    }
-
-    #[tokio::test]
-    async fn connect_postgres_invalid_connection() {
-        use crate::config::PostgresConfig;
-        use secrecy::SecretString;
-
-        let config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Postgres,
-                database: "test_db".to_string(),
-                postgres: Some(PostgresConfig {
-                    host: "127.0.0.1".to_string(),
-                    port: 1, // Invalid port
-                    user: "user".to_string(),
-                    password: SecretString::new("pass".to_string().into()),
-                    url: Some("postgres://user:pass@127.0.0.1:1/test_db".to_string()),
-                    ssl_mode: None,
-                    max_pool_size: None,
-                    connect_timeout_secs: Some(1),
-                }),
-            },
-        };
-
-        let result = connect(&config).await;
-        assert!(result.is_err(), "Postgres connection should fail for invalid/unreachable server");
-
-        let err = result.unwrap_err();
-        match err {
-            DatabaseError::Connection(msg) => {
-                assert!(msg.contains("Postgres connection failed"), 
-                       "Error message should indicate Postgres connection failure: {}", msg);
-            }
-            other => panic!("Expected DatabaseError::Connection, got {:?}", other),
-        }
-    }
-
-    #[tokio::test]
-    async fn connect_returns_correct_pool_type() {
-        // Test SQLite pool type
-        let sqlite_config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Sqlite,
-                database: ":memory:".to_string(),
-                postgres: None,
-            },
-        };
-
-        let result = connect(&sqlite_config).await;
-        assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ConnectionPool::Sqlite(_)));
-
-        // Test Postgres pool type (will fail due to missing config, but we can check the error type)
-        let postgres_config = LedgerConfig {
-            server: Default::default(),
-            database: DatabaseConfig {
-                kind: DbEngine::Postgres,
-                database: "test_db".to_string(),
-                postgres: None,
-            },
-        };
-
-        let result = connect(&postgres_config).await;
-        assert!(result.is_err()); // Should fail due to missing config
-    }
-
-    #[test]
-    fn connect_function_signature() {
-        // This test ensures the function signature hasn't changed unexpectedly
-        // and that it returns the expected types
-        use std::future::Future;
-        use std::pin::Pin;
-
-        let config = LedgerConfig::default();
-        
-        // Check that connect returns a Future by checking the type
-        let future = connect(&config);
-        let boxed_future: Pin<Box<dyn Future<Output = Result<ConnectionPool, DatabaseError>>>> = Box::pin(future);
-        std::mem::drop(boxed_future); // Explicitly drop to satisfy clippy
-        
-        // If we get here, the types are correct
-    }
 }

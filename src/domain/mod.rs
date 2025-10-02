@@ -19,6 +19,9 @@
 //! - **Immutability**: Domain objects are immutable after creation
 //! - **Serialisation**: All types support JSON serialisation for API responses
 
+mod db_engine;
+pub use db_engine::DbEngine;
+
 /// Database row identifier type using time-ordered UUID v7.
 ///
 /// [`RowID`] provides unique, sortable identifiers that maintain chronological
@@ -31,8 +34,8 @@ pub use row_id::RowID;
 /// [`CategoryTypes`] represents the fundamental accounting categories
 /// (assets, liabilities, income, expenses, equity) used to classify
 /// and organise financial transactions in the personal ledger.
-mod category_types;
-pub use category_types::CategoryTypes;
+// mod category_types;
+// pub use category_types::CategoryTypes;
 
 mod url_slug;
 pub use url_slug::UrlSlug;

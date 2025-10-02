@@ -5,4 +5,5 @@ pub use error::DatabaseResult;
 mod connect;
 pub use connect::connect;
 
-pub mod categories;
+mod categories;
+pub use categories::*;

@@ -251,6 +251,46 @@ impl From<&str> for UrlSlug {
     }
 }
 
+// SQLx trait implementations for database integration
+impl sqlx::Type<sqlx::Postgres> for UrlSlug {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::Type<sqlx::Postgres>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Postgres> for UrlSlug {
+    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for UrlSlug {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for UrlSlug {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
+    }
+}
+
+impl sqlx::Type<sqlx::Any> for UrlSlug {
+    fn type_info() -> sqlx::any::AnyTypeInfo {
+        <String as sqlx::Type<sqlx::Any>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Any> for UrlSlug {
+    fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
+        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

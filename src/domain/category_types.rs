@@ -255,6 +255,38 @@ impl CategoryTypes {
     }
 }
 
+// SQLx trait implementations for database integration
+impl sqlx::Type<sqlx::Any> for CategoryTypes {
+    fn type_info() -> sqlx::any::AnyTypeInfo {
+        <String as sqlx::Type<sqlx::Any>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Any> for CategoryTypes {
+    fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
+        Ok(CategoryTypes::from_str(&s).map_err(|e| format!("Invalid category type in database: {}", e))?)
+    }
+}
+
+// SQLx trait implementations for DateTime<Utc> to work with Any database
+impl sqlx::Type<sqlx::Any> for chrono::DateTime<chrono::Utc> {
+    fn type_info() -> sqlx::any::AnyTypeInfo {
+        // Use a generic type that works across databases
+        <String as sqlx::Type<sqlx::Any>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Any> for chrono::DateTime<chrono::Utc> {
+    fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        // Try to decode as string and parse
+        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
+        Ok(chrono::DateTime::parse_from_rfc3339(&s)
+            .map_err(|e| format!("Invalid datetime in database: {}", e))?
+            .with_timezone(&chrono::Utc))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
