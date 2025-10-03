@@ -15,5 +15,5 @@
 
 // mod insert;
 
-// pub mod model;
-// pub use model::Category;
+pub mod model;
+pub use model::Category;

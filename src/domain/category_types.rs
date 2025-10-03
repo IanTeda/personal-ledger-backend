@@ -80,9 +80,11 @@ impl std::str::FromStr for CategoryTypes {
     /// use std::str::FromStr;
     /// use personal_ledger_backend::domain::CategoryTypes;
     ///
-    /// let category = CategoryTypes::from_str("asset")?;
+    /// let category = CategoryTypes::from_str("asset").unwrap();
     /// assert_eq!(category, CategoryTypes::Asset);
-    /// # Ok::<(), personal_ledger_backend::domain::CategoryTypesError>(())
+    ///
+    /// // Invalid strings return an error
+    /// assert!(CategoryTypes::from_str("invalid").is_err());
     /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
@@ -141,26 +143,66 @@ impl CategoryTypes {
     }
 
     /// Returns true if the category type is Asset.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use personal_ledger_backend::domain::CategoryTypes;
+    /// assert!(CategoryTypes::Asset.is_asset());
+    /// assert!(!CategoryTypes::Expense.is_asset());
+    /// ```
     pub fn is_asset(&self) -> bool {
         matches!(self, CategoryTypes::Asset)
     }
 
     /// Returns true if the category type is Liability.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use personal_ledger_backend::domain::CategoryTypes;
+    /// assert!(CategoryTypes::Liability.is_liability());
+    /// assert!(!CategoryTypes::Asset.is_liability());
+    /// ```
     pub fn is_liability(&self) -> bool {
         matches!(self, CategoryTypes::Liability)
     }
 
     /// Returns true if the category type is Income.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use personal_ledger_backend::domain::CategoryTypes;
+    /// assert!(CategoryTypes::Income.is_income());
+    /// assert!(!CategoryTypes::Expense.is_income());
+    /// ```
     pub fn is_income(&self) -> bool {
         matches!(self, CategoryTypes::Income)
     }
 
     /// Returns true if the category type is Expense.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use personal_ledger_backend::domain::CategoryTypes;
+    /// assert!(CategoryTypes::Expense.is_expense());
+    /// assert!(!CategoryTypes::Income.is_expense());
+    /// ```
     pub fn is_expense(&self) -> bool {
         matches!(self, CategoryTypes::Expense)
     }
 
     /// Returns true if the category type is Equity.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use personal_ledger_backend::domain::CategoryTypes;
+    /// assert!(CategoryTypes::Equity.is_equity());
+    /// assert!(!CategoryTypes::Asset.is_equity());
+    /// ```
     pub fn is_equity(&self) -> bool {
         matches!(self, CategoryTypes::Equity)
     }
@@ -256,34 +298,85 @@ impl CategoryTypes {
 }
 
 // SQLx trait implementations for database integration
+
+/// Implements SQLx `Type` trait for `CategoryTypes` to enable database storage.
+///
+/// This implementation allows `CategoryTypes` to be stored in any SQLx-supported
+/// database using the "any" driver. Values are stored as strings in the database.
 impl sqlx::Type<sqlx::Any> for CategoryTypes {
     fn type_info() -> sqlx::any::AnyTypeInfo {
         <String as sqlx::Type<sqlx::Any>>::type_info()
     }
 }
 
+/// Implements SQLx `Decode` trait for `CategoryTypes` to enable reading from database.
+///
+/// This implementation reads string values from the database and converts them
+/// to `CategoryTypes` variants using the `FromStr` implementation. Invalid values
+/// in the database will result in a decoding error.
 impl<'r> sqlx::Decode<'r, sqlx::Any> for CategoryTypes {
     fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        use std::str::FromStr;
         let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
         Ok(CategoryTypes::from_str(&s).map_err(|e| format!("Invalid category type in database: {}", e))?)
     }
 }
 
-// SQLx trait implementations for DateTime<Utc> to work with Any database
-impl sqlx::Type<sqlx::Any> for chrono::DateTime<chrono::Utc> {
+/// Newtype wrapper for `chrono::DateTime<chrono::Utc>` to enable SQLx trait implementations.
+///
+/// This wrapper provides SQLx database integration for UTC timestamps, storing them
+/// as RFC 3339 formatted strings in the database for maximum compatibility across
+/// different database backends (SQLite and PostgreSQL).
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use chrono::Utc;
+/// // Note: UtcDateTime is internal and not exposed in the public API.
+/// // It's used internally for database serialization.
+/// let now = Utc::now();
+/// // let wrapped = UtcDateTime::from(now);
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct UtcDateTime(pub chrono::DateTime<chrono::Utc>);
+
+/// Implements SQLx `Type` trait for `UtcDateTime` to enable database storage.
+///
+/// Timestamps are stored as strings in RFC 3339 format for compatibility
+/// across different database backends.
+impl sqlx::Type<sqlx::Any> for UtcDateTime {
     fn type_info() -> sqlx::any::AnyTypeInfo {
-        // Use a generic type that works across databases
         <String as sqlx::Type<sqlx::Any>>::type_info()
     }
 }
 
-impl<'r> sqlx::Decode<'r, sqlx::Any> for chrono::DateTime<chrono::Utc> {
+/// Implements SQLx `Decode` trait for `UtcDateTime` to enable reading from database.
+///
+/// This implementation reads RFC 3339 formatted strings from the database and
+/// converts them to UTC timestamps. Invalid datetime strings will result in
+/// a decoding error.
+impl<'r> sqlx::Decode<'r, sqlx::Any> for UtcDateTime {
     fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        // Try to decode as string and parse
         let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
-        Ok(chrono::DateTime::parse_from_rfc3339(&s)
-            .map_err(|e| format!("Invalid datetime in database: {}", e))?
-            .with_timezone(&chrono::Utc))
+        Ok(UtcDateTime(
+            chrono::DateTime::parse_from_rfc3339(&s)
+                .map_err(|e| format!("Invalid datetime in database: {}", e))?
+                .with_timezone(&chrono::Utc),
+        ))
+    }
+}
+
+/// Converts a `chrono::DateTime<Utc>` into a `UtcDateTime` wrapper.
+impl From<chrono::DateTime<chrono::Utc>> for UtcDateTime {
+    fn from(dt: chrono::DateTime<chrono::Utc>) -> Self {
+        UtcDateTime(dt)
+    }
+}
+
+/// Extracts the inner `chrono::DateTime<Utc>` from a `UtcDateTime` wrapper.
+impl From<UtcDateTime> for chrono::DateTime<chrono::Utc> {
+    fn from(udt: UtcDateTime) -> Self {
+        udt.0
     }
 }
 

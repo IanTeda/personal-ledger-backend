@@ -34,8 +34,8 @@ pub use row_id::RowID;
 /// [`CategoryTypes`] represents the fundamental accounting categories
 /// (assets, liabilities, income, expenses, equity) used to classify
 /// and organise financial transactions in the personal ledger.
-// mod category_types;
-// pub use category_types::CategoryTypes;
+mod category_types;
+pub use category_types::CategoryTypes;
 
 mod url_slug;
 pub use url_slug::UrlSlug;
