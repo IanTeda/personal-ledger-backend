@@ -773,7 +773,7 @@ mod tests {
     #[test]
     fn test_error_display() {
         let uuid_error = RowIDError::InvalidUuid("bad format".to_string());
-        assert_eq!(format!("{}", uuid_error), "Invalid UUID: bad format");
+        assert_eq!(format!("{}", uuid_error), "Invalid UUID format: bad format");
     }
 
     #[test]
