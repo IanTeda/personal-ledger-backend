@@ -72,7 +72,7 @@ use crate::domain;
 /// - `is_active`: Visibility flag for new transactions (preserves historical data)
 /// - `created_on`: UTC timestamp of initial creation
 /// - `updated_on`: UTC timestamp of last modification
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Category {
     /// Unique time-ordered identifier for the category.
     ///
@@ -137,6 +137,37 @@ pub struct Category {
     ///
     /// Updated automatically whenever any field is changed.
     pub updated_on: chrono::DateTime<chrono::Utc>,
+}
+
+// Manual FromRow implementation to handle DateTime<Utc> conversion from String
+impl<'r> sqlx::FromRow<'r, sqlx::any::AnyRow> for Category {
+    fn from_row(row: &'r sqlx::any::AnyRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+        
+        let created_on_str: String = row.try_get("created_on")?;
+        let updated_on_str: String = row.try_get("updated_on")?;
+        
+        let created_on = chrono::DateTime::parse_from_rfc3339(&created_on_str)
+            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?
+            .with_timezone(&chrono::Utc);
+        let updated_on = chrono::DateTime::parse_from_rfc3339(&updated_on_str)
+            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?
+            .with_timezone(&chrono::Utc);
+
+        Ok(Category {
+            id: row.try_get("id")?,
+            code: row.try_get("code")?,
+            name: row.try_get("name")?,
+            description: row.try_get("description")?,
+            slug: row.try_get("slug")?,
+            category_type: row.try_get("category_type")?,
+            color: row.try_get("color")?,
+            icon: row.try_get("icon")?,
+            is_active: row.try_get("is_active")?,
+            created_on,
+            updated_on,
+        })
+    }
 }
 
 impl Category {
@@ -676,7 +707,7 @@ impl CategoryBuilder {
     ///
     /// # Arguments
     ///
-    /// * `is_active` - `true` to make category available, `false` to hide it
+    /// * `active` - `true` to make category available, `false` to hide it
     ///
     /// # Use Cases
     ///
@@ -695,7 +726,7 @@ impl CategoryBuilder {
     ///     .code("CURRENT")
     ///     .name("Current Category")
     ///     .category_type(CategoryTypes::Expense)
-    ///     .is_active(true)
+    ///     .with_active(true)
     ///     .build();
     ///
     /// // Deactivated category (hidden from selection)
@@ -703,11 +734,11 @@ impl CategoryBuilder {
     ///     .code("OLD")
     ///     .name("Deprecated Category")
     ///     .category_type(CategoryTypes::Expense)
-    ///     .is_active(false)
+    ///     .with_active(false)
     ///     .build();
     /// ```
-    pub fn is_active(mut self, is_active: bool) -> Self {
-        self.is_active = Some(is_active);
+    pub fn with_active(mut self, active: bool) -> Self {
+        self.is_active = Some(active);
         self
     }
 
@@ -832,7 +863,7 @@ mod tests {
             .category_type(CategoryTypes::Expense)
             .color("#4CAF50")
             .icon("shopping-cart")
-            .is_active(true)
+            .with_active(true)
             .build();
 
         assert_eq!(category.code, "FOOD-001");
@@ -897,7 +928,7 @@ mod tests {
             .code("TEST")
             .name("Test")
             .category_type(CategoryTypes::Asset)
-            .is_active(false)
+            .with_active(false)
             .build();
 
         assert!(!category.is_active);
@@ -987,7 +1018,7 @@ mod tests {
             .category_type(CategoryTypes::Expense)
             .color("#FF5733")
             .icon("test-icon")
-            .is_active(false)
+            .with_active(false)
             .build();
 
         // Test serialization
@@ -1057,62 +1088,113 @@ mod tests {
 
         // Test code format (XXX.XXX.XXX)
         assert_eq!(mock.code.len(), 11, "Code should be 11 characters");
-        assert_eq!(mock.code.chars().nth(3), Some('.'), "Code should have dot at position 3");
-        assert_eq!(mock.code.chars().nth(7), Some('.'), "Code should have dot at position 7");
+        assert_eq!(
+            mock.code.chars().nth(3),
+            Some('.'),
+            "Code should have dot at position 3"
+        );
+        assert_eq!(
+            mock.code.chars().nth(7),
+            Some('.'),
+            "Code should have dot at position 7"
+        );
 
         // Test that code contains only valid characters
         for (i, c) in mock.code.chars().enumerate() {
             if i != 3 && i != 7 {
-                assert!(c.is_ascii_uppercase() || c.is_ascii_digit(),
-                       "Code character '{}' at position {} should be uppercase alphanumeric", c, i);
+                assert!(
+                    c.is_ascii_uppercase() || c.is_ascii_digit(),
+                    "Code character '{}' at position {} should be uppercase alphanumeric",
+                    c,
+                    i
+                );
             }
         }
 
         // Test name properties
-        assert!(!mock.name.is_empty(), "Name should have at least 1 character");
+        assert!(
+            !mock.name.is_empty(),
+            "Name should have at least 1 character"
+        );
         assert!(mock.name.len() <= 50, "Name should not be excessively long");
 
         // Test slug generation (when present)
         if let Some(slug) = &mock.slug {
-            assert!(!slug.as_str().is_empty(), "Slug should not be empty when present");
+            assert!(
+                !slug.as_str().is_empty(),
+                "Slug should not be empty when present"
+            );
             // Slug should be derived from name, so it should contain some relation
             let slug_str = slug.as_str();
-            assert!(slug_str.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
-                   "Slug '{}' should contain only lowercase letters, digits, and hyphens", slug_str);
+            assert!(
+                slug_str
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+                "Slug '{}' should contain only lowercase letters, digits, and hyphens",
+                slug_str
+            );
         }
 
         // Test description (when present)
         if let Some(desc) = &mock.description {
-            assert!(!desc.is_empty(), "Description should not be empty when present");
-            assert!(desc.len() >= 5, "Description should be reasonably long when present");
+            assert!(
+                !desc.is_empty(),
+                "Description should not be empty when present"
+            );
+            assert!(
+                desc.len() >= 5,
+                "Description should be reasonably long when present"
+            );
         }
 
         // Test color (when present)
         if let Some(color) = &mock.color {
-            assert!(color.starts_with('#'), "Color '{}' should start with #", color);
+            assert!(
+                color.starts_with('#'),
+                "Color '{}' should start with #",
+                color
+            );
             assert_eq!(color.len(), 7, "Color '{}' should be 7 characters", color);
-            assert!(color.chars().skip(1).all(|c| c.is_ascii_hexdigit()),
-                   "Color '{}' should contain valid hex digits", color);
+            assert!(
+                color.chars().skip(1).all(|c| c.is_ascii_hexdigit()),
+                "Color '{}' should contain valid hex digits",
+                color
+            );
         }
 
         // Test icon (when present)
         if let Some(icon) = &mock.icon {
             assert!(!icon.is_empty(), "Icon should not be empty when present");
-            assert!(icon.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
-                   "Icon '{}' should contain only lowercase letters and hyphens", icon);
+            assert!(
+                icon.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
+                "Icon '{}' should contain only lowercase letters and hyphens",
+                icon
+            );
         }
 
         // Test category type is valid
-        let valid_types = [CategoryTypes::Asset, CategoryTypes::Liability,
-                          CategoryTypes::Income, CategoryTypes::Expense, CategoryTypes::Equity];
-        assert!(valid_types.contains(&mock.category_type),
-               "Category type {:?} should be one of the valid types", mock.category_type);
+        let valid_types = [
+            CategoryTypes::Asset,
+            CategoryTypes::Liability,
+            CategoryTypes::Income,
+            CategoryTypes::Expense,
+            CategoryTypes::Equity,
+        ];
+        assert!(
+            valid_types.contains(&mock.category_type),
+            "Category type {:?} should be one of the valid types",
+            mock.category_type
+        );
 
         // Test timestamps
-        assert!(mock.created_on >= chrono::DateTime::UNIX_EPOCH,
-               "Created timestamp should be after Unix epoch");
-        assert!(mock.updated_on >= mock.created_on,
-               "Updated timestamp should be after or equal to created timestamp");
+        assert!(
+            mock.created_on >= chrono::DateTime::UNIX_EPOCH,
+            "Created timestamp should be after Unix epoch"
+        );
+        assert!(
+            mock.updated_on >= mock.created_on,
+            "Updated timestamp should be after or equal to created timestamp"
+        );
 
         // Test that the category is structurally valid (can be used in builder)
         // `is_active` is a boolean by type definition, so no runtime tautological check is required.
@@ -1151,7 +1233,7 @@ mod tests {
             .icon("dollar-sign")
             .color("#00FF00")
             .slug("monthly-salary")
-            .is_active(true)
+            .with_active(true)
             .build();
 
         assert_eq!(category.code, "SALARY");

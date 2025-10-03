@@ -483,6 +483,34 @@ impl From<uuid::Error> for RowIDError {
     }
 }
 
+// SQLx database integration
+impl sqlx::Type<sqlx::Any> for RowID {
+    fn type_info() -> <sqlx::Any as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Any>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Any> for RowID {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Any as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        let s = self.0.to_string();
+        <String as sqlx::Encode<sqlx::Any>>::encode_by_ref(&s, buf)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Any> for RowID {
+    fn decode(
+        value: <sqlx::Any as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
+        let uuid = uuid::Uuid::parse_str(&s)
+            .map_err(|e| format!("Invalid UUID in database: {}", e))?;
+        Ok(Self(uuid))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

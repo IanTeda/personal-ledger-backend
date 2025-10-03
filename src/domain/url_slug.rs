@@ -284,6 +284,15 @@ impl sqlx::Type<sqlx::Any> for UrlSlug {
     }
 }
 
+impl<'q> sqlx::Encode<'q, sqlx::Any> for UrlSlug {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Any as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <String as sqlx::Encode<sqlx::Any>>::encode_by_ref(&self.0, buf)
+    }
+}
+
 impl<'r> sqlx::Decode<'r, sqlx::Any> for UrlSlug {
     fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;

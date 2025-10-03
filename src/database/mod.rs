@@ -6,4 +6,4 @@ mod connect;
 pub use connect::connect;
 
 mod categories;
-pub use categories::*;
+pub use categories::Category;
