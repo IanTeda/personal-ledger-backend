@@ -19,15 +19,6 @@ use crate::domain;
 /// This defaults to [`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite) to keep
 /// local development and testing simple with minimal setup. Production deployments
 /// should configure PostgreSQL via the `postgres` section in configuration files.
-///
-/// # Examples
-///
-/// ```rust
-/// use personal_ledger_backend::config::database::DEFAULT_DB_ENGINE;
-/// use personal_ledger_backend::domain::DbEngine;
-///
-/// assert_eq!(DEFAULT_DB_ENGINE, DbEngine::Sqlite);
-/// ```
 pub const DEFAULT_DB_ENGINE: domain::DbEngine = domain::DbEngine::Sqlite;
 
 /// Default database name used when no value is provided by configuration.
@@ -35,28 +26,12 @@ pub const DEFAULT_DB_ENGINE: domain::DbEngine = domain::DbEngine::Sqlite;
 /// This defaults to `"personal_ledger"` to match the application name.
 /// Production deployments should override this with an environment-specific
 /// database name (e.g., `personal_ledger_prod`, `personal_ledger_staging`).
-///
-/// # Examples
-///
-/// ```rust
-/// use personal_ledger_backend::config::database::DEFAULT_DATABASE;
-///
-/// assert_eq!(DEFAULT_DATABASE, "personal_ledger");
-/// ```
 pub const DEFAULT_DATABASE: &str = "personal_ledger";
 
 /// Default PostgreSQL configuration (none by default).
 ///
 /// This is `None` by default, requiring explicit configuration for PostgreSQL
 /// connections. When using SQLite (the default engine), this field is not used.
-///
-/// # Examples
-///
-/// ```rust
-/// use personal_ledger_backend::config::database::DEFAULT_POSTGRES;
-///
-/// assert_eq!(DEFAULT_POSTGRES, None);
-/// ```
 pub const DEFAULT_POSTGRES: Option<PostgresConfig> = None;
 
 
@@ -77,10 +52,9 @@ pub const DEFAULT_POSTGRES: Option<PostgresConfig> = None;
 /// # Examples
 ///
 /// ```rust
-/// use personal_ledger_backend::config::database::{DatabaseConfig, PostgresConfig};
-/// use personal_ledger_backend::domain::DbEngine;
-/// use secrecy::SecretString;
-///
+/// # use personal_ledger_backend::config::{DatabaseConfig, PostgresConfig};
+/// # use personal_ledger_backend::domain::DbEngine;
+/// # use secrecy::SecretString;
 /// // SQLite configuration (default)
 /// let sqlite_config = DatabaseConfig::default();
 /// assert_eq!(sqlite_config.kind, DbEngine::Sqlite);
@@ -93,7 +67,7 @@ pub const DEFAULT_POSTGRES: Option<PostgresConfig> = None;
 ///         host: "localhost".to_string(),
 ///         port: 5432,
 ///         user: "ledger_user".to_string(),
-///         password: SecretString::new("secure_password".to_string()),
+///         password: SecretString::new("secure_password".into()),
 ///         url: None,
 ///         ssl_mode: Some("require".to_string()),
 ///         max_pool_size: Some(10),
@@ -134,9 +108,8 @@ impl Default for DatabaseConfig {
     /// # Examples
     ///
     /// ```rust
-    /// use personal_ledger_backend::config::database::DatabaseConfig;
-    /// use personal_ledger_backend::domain::DbEngine;
-    ///
+    /// # use personal_ledger_backend::config::DatabaseConfig;
+    /// # use personal_ledger_backend::domain::DbEngine;
     /// let config = DatabaseConfig::default();
     /// assert_eq!(config.kind, DbEngine::Sqlite);
     /// assert_eq!(config.database, "personal_ledger");
@@ -177,15 +150,14 @@ impl Default for DatabaseConfig {
 /// # Examples
 ///
 /// ```rust
-/// use personal_ledger_backend::config::database::PostgresConfig;
-/// use secrecy::SecretString;
-///
+/// # use personal_ledger_backend::config::PostgresConfig;
+/// # use secrecy::SecretString;
 /// // Field-based configuration
 /// let config = PostgresConfig {
 ///     host: "db.example.com".to_string(),
 ///     port: 5432,
 ///     user: "app_user".to_string(),
-///     password: SecretString::new("secret123".to_string()),
+///     password: SecretString::new("secret123".into()),
 ///     url: None,
 ///     ssl_mode: Some("require".to_string()),
 ///     max_pool_size: Some(20),
@@ -197,7 +169,7 @@ impl Default for DatabaseConfig {
 ///     host: "".to_string(), // Ignored when url is present
 ///     port: 0,              // Ignored when url is present
 ///     user: "".to_string(), // Ignored when url is present
-///     password: SecretString::new("".to_string()), // Ignored when url is present
+///     password: SecretString::new("".into()), // Ignored when url is present
 ///     url: Some("postgres://user:pass@db.example.com:5432/mydb?sslmode=require".to_string()),
 ///     ssl_mode: None,
 ///     max_pool_size: Some(10),
@@ -240,14 +212,13 @@ impl PartialEq for PostgresConfig {
     /// # Examples
     ///
     /// ```rust
-    /// use personal_ledger_backend::config::database::PostgresConfig;
-    /// use secrecy::SecretString;
-    ///
+    /// # use personal_ledger_backend::config::PostgresConfig;
+    /// # use secrecy::SecretString;
     /// let config1 = PostgresConfig {
     ///     host: "localhost".to_string(),
     ///     port: 5432,
     ///     user: "user".to_string(),
-    ///     password: SecretString::new("pass".to_string()),
+    ///     password: SecretString::new("pass".into()),
     ///     url: None,
     ///     ssl_mode: None,
     ///     max_pool_size: None,
@@ -291,10 +262,9 @@ impl DatabaseConfig {
     /// # Examples
     ///
     /// ```rust
-    /// use personal_ledger_backend::config::database::{DatabaseConfig, PostgresConfig};
-    /// use personal_ledger_backend::domain::DbEngine;
-    /// use secrecy::SecretString;
-    ///
+    /// # use personal_ledger_backend::config::{DatabaseConfig, PostgresConfig};
+    /// # use personal_ledger_backend::domain::DbEngine;
+    /// # use secrecy::SecretString;
     /// // SQLite URL
     /// let sqlite_config = DatabaseConfig {
     ///     kind: DbEngine::Sqlite,
@@ -312,7 +282,7 @@ impl DatabaseConfig {
     ///         host: "localhost".to_string(),
     ///         port: 5432,
     ///         user: "admin".to_string(),
-    ///         password: SecretString::new("secure".to_string()),
+    ///         password: SecretString::new("secure".into()),
     ///         url: None,
     ///         ssl_mode: Some("require".to_string()),
     ///         max_pool_size: None,
@@ -400,7 +370,7 @@ mod tests {
             host: "localhost".to_string(),
             port: 5432,
             user: "testuser".to_string(),
-            password: SecretString::new("testpass".to_string().into_boxed_str()),
+            password: SecretString::new("testpass".into()),
             url: None,
             ssl_mode: Some("require".to_string()),
             max_pool_size: Some(10),
@@ -490,7 +460,7 @@ mod tests {
                 host: "ignored".to_string(),
                 port: 0,
                 user: "ignored".to_string(),
-                password: SecretString::new("ignored".to_string().into_boxed_str()),
+                password: SecretString::new("ignored".into()),
                 url: Some("postgres://user:pass@host:5432/custom_db?sslmode=require".to_string()),
                 ssl_mode: Some("ignored".to_string()),
                 max_pool_size: None,
@@ -510,7 +480,7 @@ mod tests {
                 host: "localhost".to_string(),
                 port: 5432,
                 user: "testuser".to_string(),
-                password: SecretString::new("testpass".to_string().into_boxed_str()),
+                password: SecretString::new("testpass".into()),
                 url: None,
                 ssl_mode: Some("require".to_string()),
                 max_pool_size: None,
@@ -530,7 +500,7 @@ mod tests {
                 host: "localhost".to_string(),
                 port: 5432,
                 user: "testuser".to_string(),
-                password: SecretString::new("testpass".to_string().into_boxed_str()),
+                password: SecretString::new("testpass".into()),
                 url: None,
                 ssl_mode: None,
                 max_pool_size: None,
@@ -550,7 +520,7 @@ mod tests {
                 host: "remote.host".to_string(),
                 port: 9999,
                 user: "admin".to_string(),
-                password: SecretString::new("secret".to_string().into_boxed_str()),
+                password: SecretString::new("secret".into()),
                 url: None,
                 ssl_mode: Some("verify-full".to_string()),
                 max_pool_size: None,
@@ -570,7 +540,7 @@ mod tests {
                 host: "localhost".to_string(),
                 port: 5432,
                 user: "user@domain.com".to_string(),
-                password: SecretString::new("pass%word!".to_string().into_boxed_str()),
+                password: SecretString::new("pass%word!".into()),
                 url: None,
                 ssl_mode: None,
                 max_pool_size: None,
@@ -590,7 +560,7 @@ mod tests {
                 host: "host".to_string(),
                 port: 5432,
                 user: "user".to_string(),
-                password: SecretString::new("pass".to_string().into_boxed_str()),
+                password: SecretString::new("pass".into()),
                 url: None,
                 ssl_mode: None,
                 max_pool_size: Some(5),
@@ -613,7 +583,7 @@ mod tests {
             host: "localhost".to_string(),
             port: 5432,
             user: "test".to_string(),
-            password: SecretString::new("secret".to_string().into_boxed_str()),
+            password: SecretString::new("secret".into()),
             url: None,
             ssl_mode: Some("require".to_string()),
             max_pool_size: Some(10),
@@ -666,7 +636,7 @@ mod tests {
             host: "db.example.com".to_string(),
             port: 5432,
             user: "app_user".to_string(),
-            password: SecretString::new("secure_password".to_string().into_boxed_str()),
+            password: SecretString::new("secure_password".into()),
             url: None,
             ssl_mode: Some("require".to_string()),
             max_pool_size: Some(20),
@@ -714,7 +684,7 @@ mod tests {
             host: "localhost".to_string(),
             port: 5432,
             user: "user".to_string(),
-            password: SecretString::new("pass".to_string().into_boxed_str()),
+            password: SecretString::new("pass".into()),
             url: None,
             ssl_mode: None,
             max_pool_size: None,
@@ -737,7 +707,7 @@ mod tests {
             host: "secure-db.company.com".to_string(),
             port: 9999,
             user: "service_account".to_string(),
-            password: SecretString::new("very_secure_password_123!".to_string().into_boxed_str()),
+            password: SecretString::new("very_secure_password_123!".into()),
             url: None,
             ssl_mode: Some("verify-ca".to_string()),
             max_pool_size: Some(100),

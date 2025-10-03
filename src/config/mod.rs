@@ -18,8 +18,6 @@
 //! type information, enabling runtime type checking and appropriate handling for
 //! both SQLite and PostgreSQL backends.
 
-use crate::domain::DbEngine;
-
 mod database;
 /// Database configuration and helpers.
 pub use database::DatabaseConfig;
