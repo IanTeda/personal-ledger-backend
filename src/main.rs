@@ -2,7 +2,7 @@
 
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_reflection::server as TonicRefelectionServer;
-use personal_ledger_backend::{database, rpc, telemetry, LedgerResult};
+use personal_ledger_backend::{rpc, telemetry, LedgerResult};
 
 #[derive(Default)]
 pub struct MyUtilitiesService {}
@@ -36,8 +36,7 @@ async fn main() -> LedgerResult<()> {
     tracing::info!("Starting tracing at level '{:?}'", log_level);
 
     // Initialize the database connection pool and run migrations
-    let database_url = config.database.connection_url()?;
-    let database_pool = database::connect(&database_url).await?;
+    let _database_url = config.database.connection_url()?;
 
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()

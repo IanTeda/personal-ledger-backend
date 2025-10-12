@@ -42,6 +42,9 @@
 
 use sqlx::any as SqlxAny;
 
+#[cfg(test)]
+use sqlx::migrate::MigrateDatabase;
+
 use crate::database::{DatabaseError, DatabaseResult};
 
 /// Initialize the database connection pool and run migrations.
@@ -129,7 +132,188 @@ pub async fn connect(
 
     // Run migrations on the database pool
     sqlx::migrate!("./migrations").run(&pool).await?;
+
     tracing::info!("Database migrations complete.");
 
     Ok(pool)
+}
+
+/// Initialize a test database connection pool with automatic cleanup capability.
+///
+/// This function is similar to [`connect`] but is designed specifically for testing.
+/// It creates a test database, runs migrations, and returns both the connection pool
+/// and the database URL for later cleanup.
+///
+/// # Arguments
+///
+/// * `url` - Database connection URL string. For tests, prefer unique database names:
+///   - SQLite: `"sqlite::memory:"` for in-memory (auto-cleanup)
+///   - PostgreSQL: `"postgres://user:pass@host:port/test_db_uuid"` (requires manual cleanup)
+///
+/// # Returns
+///
+/// Returns `Ok((Pool<Any>, String))` containing:
+/// - The initialized SQLx connection pool
+/// - The database URL used (needed for cleanup with [`drop_test_database`])
+///
+/// # Errors
+///
+/// Returns a [`DatabaseError`] if connection or migration fails.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use personal_ledger_backend::database::{connect_test, drop_test_database};
+///
+/// #[tokio::test]
+/// async fn my_integration_test() -> Result<(), Box<dyn std::error::Error>> {
+///     // Create test database
+///     let (pool, url) = connect_test("sqlite::memory:").await?;
+///     
+///     // Run your test logic
+///     // ...
+///     
+///     // Cleanup (automatic for SQLite in-memory, manual for PostgreSQL)
+///     drop_test_database(&url).await?;
+///     
+///     Ok(())
+/// }
+/// ```
+///
+/// # Test Isolation
+///
+/// For PostgreSQL tests, use unique database names (e.g., with UUID) to ensure
+/// test isolation. SQLite in-memory databases are automatically isolated per connection.
+#[cfg(test)]
+pub async fn connect_test(
+    url: &str,
+) -> DatabaseResult<(sqlx::Pool<sqlx::Any>, String)> {
+    // Install SQLx "any" driver defaults
+    SqlxAny::install_default_drivers();
+
+    // Create the database if it doesn't exist (PostgreSQL only, SQLite auto-creates)
+    if url.starts_with("postgres") {
+        sqlx::Any::create_database(url).await.ok(); // Ignore error if already exists
+    }
+
+    // Build the connection pool
+    let pool = sqlx::Pool::<sqlx::Any>::connect(url)
+        .await
+        .map_err(|e| DatabaseError::Connection(e.to_string()))?;
+
+    tracing::info!("Test database connection established: {}", url);
+
+    // Run migrations on the test database pool
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    
+    tracing::info!("Test database migrations complete");
+
+    Ok((pool, url.to_string()))
+}
+
+/// Drop a test database by URL.
+///
+/// This is a convenience wrapper around [`crate::database::test::drop_test_database`]
+/// for use in test cleanup. For SQLite in-memory databases, this is a no-op as they
+/// are automatically cleaned up when the connection is closed.
+///
+/// # Arguments
+///
+/// * `url` - The database connection URL to drop
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success, or a [`DatabaseError`] if the drop operation fails.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use personal_ledger_backend::database::{connect_test, drop_test_database};
+///
+/// #[tokio::test]
+/// async fn my_test() -> Result<(), Box<dyn std::error::Error>> {
+///     let (pool, url) = connect_test("postgres://localhost/test_db_abc").await?;
+///     
+///     // ... run test ...
+///     
+///     drop(pool); // Close connections first
+///     drop_test_database(&url).await?;
+///     Ok(())
+/// }
+/// ```
+#[cfg(test)]
+pub async fn drop_test_database(url: &str) -> DatabaseResult<()> {
+    crate::database::test::drop_test_database(url).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_connect_test_sqlite_memory() -> DatabaseResult<()> {
+        let (pool, url) = connect_test("sqlite::memory:").await?;
+        
+        assert_eq!(url, "sqlite::memory:");
+        
+        // Verify connection works
+        let row: (i64,) = sqlx::query_as("SELECT 1")
+            .fetch_one(&pool)
+            .await?;
+        assert_eq!(row.0, 1);
+        
+        // Cleanup (no-op for in-memory SQLite)
+        drop(pool);
+        drop_test_database(&url).await?;
+        
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_connect_test_with_cleanup() -> DatabaseResult<()> {
+        // Use in-memory database for testing
+        let (pool, url) = connect_test("sqlite::memory:").await?;
+        
+        // Run a simple query
+        let _: (i64,) = sqlx::query_as("SELECT 1")
+            .fetch_one(&pool)
+            .await?;
+        
+        // Verify migrations ran by checking for a table
+        // (this assumes migrations create at least one table)
+        
+        // Close pool before dropping database
+        drop(pool);
+        
+        // Cleanup should succeed (no-op for in-memory)
+        drop_test_database(&url).await?;
+        
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_connect_test_isolation() -> DatabaseResult<()> {
+        // Create two separate test databases
+        let (pool1, url1) = connect_test("sqlite::memory:").await?;
+        let (pool2, url2) = connect_test("sqlite::memory:").await?;
+        
+        // They should be isolated
+        sqlx::query("CREATE TABLE test (id INTEGER)")
+            .execute(&pool1)
+            .await?;
+        
+        // pool2 should not see pool1's table
+        let result = sqlx::query("SELECT * FROM test")
+            .fetch_optional(&pool2)
+            .await;
+        assert!(result.is_err()); // Table doesn't exist in pool2
+        
+        // Cleanup
+        drop(pool1);
+        drop(pool2);
+        drop_test_database(&url1).await?;
+        drop_test_database(&url2).await?;
+        
+        Ok(())
+    }
 }

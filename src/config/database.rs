@@ -1,12 +1,47 @@
 //! Database configuration and connection helpers.
 //!
-//! This module defines the `DatabaseConfig` domain type and helpers for
-//! creating `sqlx` connection pools for the configured engine. The current
-//! implementation supports Postgres and Sqlite.
+//! This module defines the [`DatabaseConfig`] and [`PostgresConfig`] types, as well as
+//! constants and helpers for creating SQLx connection pools for the configured engine.
 //!
-//! Defaults are intentionally conservative (in-memory sqlite) to make tests
-//! and local development simple; production deployments should provide a
-//! Postgres configuration via the `postgres` section or the `url` field.
+//! # Supported Engines
+//!
+//! - [`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite): Default for local development and tests
+//! - [`DbEngine::Postgres`](crate::domain::DbEngine::Postgres): Recommended for production
+//!
+//! # Defaults
+//!
+//! Defaults are intentionally conservative (in-memory SQLite) to make tests and local
+//! development simple. Production deployments should provide a Postgres configuration via
+//! the `postgres` section or the `url` field.
+//!
+//! # Example
+//!
+//! ```rust
+//! use personal_ledger_backend::config::{DatabaseConfig, PostgresConfig};
+//! use personal_ledger_backend::domain::DbEngine;
+//! use secrecy::SecretString;
+//!
+//! // Default (SQLite)
+//! let config = DatabaseConfig::default();
+//! assert_eq!(config.kind, DbEngine::Sqlite);
+//!
+//! // Postgres
+//! let pg = PostgresConfig {
+//!     host: "localhost".to_string(),
+//!     port: 5432,
+//!     user: "user".to_string(),
+//!     password: SecretString::new("pw".into()),
+//!     url: None,
+//!     ssl_mode: Some("require".to_string()),
+//!     max_pool_size: Some(10),
+//!     connect_timeout_secs: Some(30),
+//! };
+//! let config = DatabaseConfig {
+//!     kind: DbEngine::Postgres,
+//!     database: "ledger".to_string(),
+//!     postgres: Some(pg),
+//! };
+//! ```
 
 // Re-export the secrecy trait used when composing connection URLs.
 use secrecy::ExposeSecret;
@@ -16,16 +51,16 @@ use crate::domain;
 
 /// Default database engine used when no configuration is provided.
 ///
-/// This defaults to [`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite) to keep
-/// local development and testing simple with minimal setup. Production deployments
-/// should configure PostgreSQL via the `postgres` section in configuration files.
+/// Defaults to [`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite) for ease of
+/// local development and testing. Production deployments should configure PostgreSQL
+/// via the `postgres` section in configuration files.
 pub const DEFAULT_DB_ENGINE: domain::DbEngine = domain::DbEngine::Sqlite;
 
 /// Default database name used when no value is provided by configuration.
 ///
-/// This defaults to `"personal_ledger"` to match the application name.
-/// Production deployments should override this with an environment-specific
-/// database name (e.g., `personal_ledger_prod`, `personal_ledger_staging`).
+/// Defaults to `"personal_ledger"` to match the application name. Production
+/// deployments should override this with an environment-specific database name
+/// (e.g., `personal_ledger_prod`, `personal_ledger_staging`).
 pub const DEFAULT_DATABASE: &str = "personal_ledger";
 
 /// Default PostgreSQL configuration (none by default).
@@ -44,17 +79,18 @@ pub const DEFAULT_POSTGRES: Option<PostgresConfig> = None;
 ///
 /// # Fields
 ///
-/// - `kind`: The database engine to use ([`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite) 
+/// - `kind`: The database engine to use ([`DbEngine::Sqlite`](crate::domain::DbEngine::Sqlite)
 ///   or [`DbEngine::Postgres`](crate::domain::DbEngine::Postgres))
 /// - `database`: Name of the database file (SQLite) or database name (PostgreSQL)
 /// - `postgres`: PostgreSQL-specific settings, required when `kind` is `Postgres`
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
-/// # use personal_ledger_backend::config::{DatabaseConfig, PostgresConfig};
-/// # use personal_ledger_backend::domain::DbEngine;
-/// # use secrecy::SecretString;
+/// use personal_ledger_backend::config::{DatabaseConfig, PostgresConfig};
+/// use personal_ledger_backend::domain::DbEngine;
+/// use secrecy::SecretString;
+///
 /// // SQLite configuration (default)
 /// let sqlite_config = DatabaseConfig::default();
 /// assert_eq!(sqlite_config.kind, DbEngine::Sqlite);
@@ -147,11 +183,12 @@ impl Default for DatabaseConfig {
 /// - `max_pool_size`: Optional maximum connections in the connection pool
 /// - `connect_timeout_secs`: Optional connection timeout in seconds
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
-/// # use personal_ledger_backend::config::PostgresConfig;
-/// # use secrecy::SecretString;
+/// use personal_ledger_backend::config::PostgresConfig;
+/// use secrecy::SecretString;
+///
 /// // Field-based configuration
 /// let config = PostgresConfig {
 ///     host: "db.example.com".to_string(),
@@ -339,6 +376,79 @@ impl DatabaseConfig {
         };
         
         tracing::info!("Constructed database URL for");
+
+        Ok(url)
+    }
+
+    #[cfg(test)]
+    pub fn test_connection_url(&self) -> Result<String, ConfigError> {
+        use uuid::Uuid;
+
+        // Randomly select database engine for testing
+        let random_engine = domain::DbEngine::random();
+
+        let url = match random_engine {
+            domain::DbEngine::Sqlite => {
+                // Use in-memory SQLite for tests to ensure isolation
+                "sqlite::memory:".to_string()
+            }
+            domain::DbEngine::Postgres => {
+                // Ensure we have a Postgres config
+                let pg = match &self.postgres {
+                    Some(cfg) => cfg,
+                    None => {
+                        return Err(ConfigError::Validation(
+                            "postgres configuration missing for random postgres test".to_string(),
+                        ));
+                    }
+                };
+
+                // Use a random database name for test isolation
+                let test_database = format!("test_{}", Uuid::now_v7().simple()).replace('-', "_");
+
+                // If a full URL is provided, modify it; otherwise compose one from fields
+                if let Some(u) = &pg.url {
+                    // Replace the database name in the URL with a test database
+                    // Need to handle URLs with query parameters properly
+                    if let Some(query_start) = u.find('?') {
+                        // URL has query parameters: postgres://host:port/db?query
+                        let base_with_host = &u[..query_start]; // postgres://host:port/db
+                        if let Some(db_start) = base_with_host.rfind('/') {
+                            let base_url = &base_with_host[..=db_start]; // postgres://host:port/
+                            let query_part = &u[query_start..]; // ?query
+                            format!("{}{}{}", base_url, test_database, query_part)
+                        } else {
+                            // Fallback: couldn't find database separator
+                            format!("{}/{}?{}", base_with_host, test_database, &u[query_start + 1..])
+                        }
+                    } else {
+                        // URL without query parameters: postgres://host:port/db
+                        if let Some(db_start) = u.rfind('/') {
+                            let base_url = &u[..=db_start];
+                            format!("{}{}", base_url, test_database)
+                        } else {
+                            // Fallback: append test database if no clear database separator
+                            format!("{}/{}", u, test_database)
+                        }
+                    }
+                } else {
+                    let mut base = format!(
+                        "postgres://{}:{}@{}:{}/{}",
+                        pg.user,
+                        pg.password.expose_secret(),
+                        pg.host,
+                        pg.port,
+                        test_database
+                    );
+                    if let Some(ssl) = &pg.ssl_mode {
+                        base = format!("{}?sslmode={}", base, ssl);
+                    }
+                    base
+                }
+            }
+        };
+
+        tracing::info!("Constructed test database URL (random engine: {}): {}", random_engine, url);
 
         Ok(url)
     }
@@ -722,5 +832,152 @@ mod tests {
 
         let url = db_config.connection_url().unwrap();
         assert_eq!(url, "postgres://service_account:very_secure_password_123!@secure-db.company.com:9999/production_ledger?sslmode=verify-ca");
+    }
+
+    #[test]
+    fn test_test_connection_url_sqlite() {
+        // Test that test_connection_url can return SQLite URLs
+        // Since it's random, we need to test multiple times to increase chances
+        let config = DatabaseConfig::default();
+        let mut found_sqlite = false;
+
+        // Try up to 100 times to get a SQLite result
+        for _ in 0..100 {
+            if matches!(config.test_connection_url(), Ok(url) if url == "sqlite::memory:") {
+                found_sqlite = true;
+                break;
+            }
+        }
+
+        assert!(found_sqlite, "test_connection_url should be able to return SQLite URLs");
+    }
+
+    #[test]
+    fn test_test_connection_url_postgres_with_config() {
+        // Test that test_connection_url can return Postgres URLs when config is available
+        let postgres_config = PostgresConfig {
+            host: "localhost".to_string(),
+            port: 5432,
+            user: "testuser".to_string(),
+            password: SecretString::new("testpass".into()),
+            url: None,
+            ssl_mode: Some("require".to_string()),
+            max_pool_size: None,
+            connect_timeout_secs: None,
+        };
+
+        let config = DatabaseConfig {
+            kind: domain::DbEngine::Postgres,
+            database: "test_db".to_string(),
+            postgres: Some(postgres_config),
+        };
+
+        let mut found_postgres = false;
+
+        // Try up to 100 times to get a Postgres result
+        for _ in 0..100 {
+            if let Ok(url) = config.test_connection_url() &&
+                url.starts_with("postgres://") && url.contains("testuser:testpass@localhost:5432/test_") {
+                found_postgres = true;
+                // Verify it uses a random database name starting with "test_"
+                assert!(url.contains("test_"), "Postgres test URL should use random database name starting with 'test_'");
+                break;
+            }
+        }
+
+        assert!(found_postgres, "test_connection_url should be able to return Postgres URLs when config is available");
+    }
+
+    #[test]
+    fn test_test_connection_url_postgres_with_url() {
+        // Test that test_connection_url modifies full Postgres URLs with random database names
+        let postgres_config = PostgresConfig {
+            host: "localhost".to_string(),
+            port: 5432,
+            user: "testuser".to_string(),
+            password: SecretString::new("testpass".into()),
+            url: Some("postgres://user:pass@host:5432/original_db?sslmode=require".to_string()),
+            ssl_mode: None,
+            max_pool_size: None,
+            connect_timeout_secs: None,
+        };
+
+        let config = DatabaseConfig {
+            kind: domain::DbEngine::Postgres,
+            database: "ignored".to_string(),
+            postgres: Some(postgres_config),
+        };
+
+        let mut found_modified_url = false;
+
+        // Try up to 100 times to get a Postgres result
+        for i in 0..100 {
+            if let Ok(url) = config.test_connection_url() {
+                println!("Attempt {}: URL = {}", i, url);
+                if url.starts_with("postgres://user:pass@host:5432/test_") && url.ends_with("?sslmode=require") {
+                    found_modified_url = true;
+                    // Verify the database name was replaced with a random one
+                    assert!(url.contains("/test_"), "URL should have random database name");
+                    assert!(!url.contains("/original_db"), "Original database name should be replaced");
+                    break;
+                }
+            }
+        }
+
+        assert!(found_modified_url, "test_connection_url should modify full Postgres URLs with random database names");
+    }
+
+    #[test]
+    fn test_test_connection_url_postgres_missing_config() {
+        // Test that test_connection_url returns error when postgres is randomly selected but no config exists
+        let config = DatabaseConfig {
+            kind: domain::DbEngine::Sqlite, // Config says SQLite
+            database: "test".to_string(),
+            postgres: None, // But no postgres config
+        };
+
+        let mut found_error = false;
+
+        // Try up to 100 times - some will succeed (SQLite), some will fail (Postgres without config)
+        for _ in 0..100 {
+            let result = config.test_connection_url();
+            if matches!(result, Err(ConfigError::Validation(msg)) if msg.contains("postgres configuration missing for random postgres test")) {
+                found_error = true;
+                break;
+            }
+        }
+
+        assert!(found_error, "test_connection_url should return error when postgres is randomly selected but no config exists");
+    }
+
+    #[test]
+    fn test_test_connection_url_randomness() {
+        // Test that test_connection_url actually produces different results over multiple calls
+        let config = DatabaseConfig {
+            kind: domain::DbEngine::Postgres,
+            database: "test".to_string(),
+            postgres: Some(PostgresConfig {
+                host: "localhost".to_string(),
+                port: 5432,
+                user: "user".to_string(),
+                password: SecretString::new("pass".into()),
+                url: None,
+                ssl_mode: None,
+                max_pool_size: None,
+                connect_timeout_secs: None,
+            }),
+        };
+
+        let mut urls = std::collections::HashSet::new();
+
+        // Collect results from multiple calls
+        for _ in 0..50 {
+            if let Ok(url) = config.test_connection_url() {
+                urls.insert(url);
+            }
+        }
+
+        // We should get at least 2 different URLs (SQLite memory + various Postgres random DBs)
+        assert!(urls.len() >= 2, "test_connection_url should produce different results over multiple calls, got {} unique URLs", urls.len());
     }
 }
