@@ -1,16 +1,17 @@
 //! Configuration loader and domain types for the Personal Ledger backend.
 //!
-//! This module exposes `LedgerConfig` (the top-level configuration type)
-//! and re-exports `ServerConfig` plus the `ConfigError` type used for
-//! parse-time failures.
+//! This module defines `LedgerConfig` (the top-level configuration type)
+//! and provides the `parse()` method for loading configuration from defaults,
+//! optional config files, and environment variables.
 //!
 //! Configuration is merged from three sources (in increasing precedence):
 //! defaults, an optional INI file under `config/`, and environment variables
-//! prefixed with `LEDGER_BACKEND`.
+//! prefixed with `LEDGER_BACKEND_`.
+//!
+//! The `ServerConfig` and `ConfigError` types are re-exported by the parent
+//! [`super::mod`] module for convenience.
 
-use config::Config as ConfigLib;
-
-use crate::config::{database, server};
+use config::{Config, Environment, File, FileFormat};
 
 /// Environment variable prefix used for overriding configuration values.
 ///
@@ -22,16 +23,11 @@ pub const ENV_SUFFIX: &str = "LEDGER_BACKEND";
 ///
 /// `LedgerConfig` is deserialised from a combination of defaults, an optional
 /// INI configuration file and environment variables. The structure currently
-/// only contains the `server` section (network bind and TLS settings), but the
-/// type is intentionally extensible for additional sections such as database
-/// configuration in future.
+/// contains the `server` section (network bind, TLS, and database settings).
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 pub struct LedgerConfig {
     /// Server configuration settings.
-    pub server: server::ServerConfig,
-
-    /// Database configuration settings.
-    pub database: database::DatabaseConfig,
+    pub server: super::ServerConfig,
 }
 
 impl LedgerConfig {
@@ -51,44 +47,43 @@ impl LedgerConfig {
     ///
     /// Returns a `ConfigError` if there is a problem reading/parsing any of
     /// the sources or deserialising into `LedgerConfig`.
-    pub fn parse() -> Result<LedgerConfig, crate::config::ConfigError> {
+    pub fn parse() -> super::ConfigResult<LedgerConfig> {
         // Get the directory that the binary is being run from
-        let binary_path =
-            std::env::current_dir().expect("Failed to determine the current directory");
+        let binary_path = std::env::current_dir()
+            .map_err(|e| super::ConfigError::Validation(format!("Failed to determine current directory: {}", e)))?;
 
         // Set the configuration directory for the app
         let config_directory = binary_path.join("config");
 
         // Set the configuration file name to be the package name with .conf extension
-        let config_filename = format!("{}.conf", server::CONFIG_FILE_NAME);
+        let config_filename = format!("{}.conf", super::server::CONFIG_FILE_NAME);
 
         // Set the default config file path
         let config_file_path = config_directory.join(config_filename);
 
         // Start with defaults (lowest priority)
-        let mut builder = ConfigLib::builder()
-            .set_default("server.address", server::DEFAULT_SERVER_ADDRESS)?
-            .set_default("server.port", server::DEFAULT_SERVER_PORT)?
-            .set_default("server.data_dir", server::DEFAULT_DATA_DIR)?
-            .set_default("server.tls_enabled", server::DEFAULT_TLS_ENABLED)?
-            .set_default("database.kind", database::DEFAULT_DB_ENGINE.to_string())?;
+        let mut builder = Config::builder()
+            .set_default("server.address", super::server::DEFAULT_SERVER_ADDRESS)?
+            .set_default("server.port", super::server::DEFAULT_SERVER_PORT)?
+            .set_default("server.data_dir", super::server::DEFAULT_DATA_DIR)?
+            .set_default("server.tls_enabled", super::server::DEFAULT_TLS_ENABLED)?;
 
         // If the config file exists, load it (overrides defaults). If not, warn and continue with defaults
         if config_file_path.exists() {
             // The repository contains `config/ledger-backend.conf` as an INI-style
             // file. Explicitly load the file as INI so the parser accepts `.conf`.
             builder = builder
-                .add_source(config::File::from(config_file_path).format(config::FileFormat::Ini));
+                .add_source(File::from(config_file_path).format(FileFormat::Ini));
         } else {
             tracing::warn!(
-                "Config file '{}' not found; using defaults and environment variables",
+                "Config file '{}' not found; using defaults and environment variables if set",
                 config_file_path.display()
             );
         }
 
         // Finally add environment variables (highest priority)
         builder = builder.add_source(
-            config::Environment::with_prefix(ENV_SUFFIX)
+            Environment::with_prefix(ENV_SUFFIX)
                 .prefix_separator("_")
                 .separator("_"),
         );
@@ -131,10 +126,6 @@ mod tests {
                 .set_default("server.data_dir", defaults.server.data_dir.as_ref().map(|p| p.to_string_lossy().to_string()))
                 .unwrap()
                 .set_default("server.tls_enabled", defaults.server.tls_enabled)
-                .unwrap()
-                .set_default("database.kind", defaults.database.kind.to_string())
-                .unwrap()
-                .set_default("database.database", defaults.database.database.clone())
                 .unwrap()
                 .add_source(
                     config::Environment::with_prefix(ENV_SUFFIX)

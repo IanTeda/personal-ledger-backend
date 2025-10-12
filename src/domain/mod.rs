@@ -10,7 +10,6 @@
 //! ## Available Types
 //!
 //! - [`CategoryTypes`] - Classification types for financial transactions
-//! - [`DbEngine`] - Database backend selection (SQLite or PostgreSQL)
 //! - [`RowID`] - Time-ordered UUID v7 identifiers for database rows
 //! - [`UrlSlug`] - URL-safe identifiers for web-friendly resource names
 //!
@@ -20,14 +19,10 @@
 //! - **Validation**: Enforce business rules at construction time
 //! - **Immutability**: Domain objects are immutable after creation
 //! - **Serialisation**: All types support JSON serialisation for API responses
-
-mod db_engine;
-/// Database backend selector for runtime database engine configuration.
-///
-/// [`DbEngine`] determines which database system (SQLite or PostgreSQL) the
-/// application connects to, enabling flexible deployment options from embedded
-/// databases to enterprise PostgreSQL servers.
-pub use db_engine::DbEngine;
+//!
+//! ## Note
+//!
+//! This domain layer is designed for SQLite-backed persistence and does not reference Postgres or other database engines. All type mappings and invariants are implemented for SQLite compatibility.
 
 /// Database row identifier type using time-ordered UUID v7.
 ///

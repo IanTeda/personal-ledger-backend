@@ -36,7 +36,7 @@ async fn main() -> LedgerResult<()> {
     tracing::info!("Starting tracing at level '{:?}'", log_level);
 
     // Initialize the database connection pool and run migrations
-    let _database_url = config.database.connection_url()?;
+    let _database_url = config.server.database_url()?;
 
     // Build reflections service
     let reflections_service = TonicRefelectionServer::Builder::configure()

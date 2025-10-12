@@ -6,6 +6,9 @@
 
 use config::ConfigError as ConfigLibError;
 
+/// Result type alias used across configuration module.
+pub type ConfigResult<T> = std::result::Result<T, ConfigError>;
+
 #[derive(thiserror::Error, Debug)]
 /// Errors produced while loading or validating configuration.
 ///
@@ -33,7 +36,6 @@ pub enum ConfigError {
     #[error("Invalid server address: {0}")]
     InvalidServerAddress(#[from] std::net::AddrParseError),
 }
-
 
 #[cfg(test)]
 mod tests {
