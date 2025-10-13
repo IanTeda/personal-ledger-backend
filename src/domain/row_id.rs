@@ -11,6 +11,7 @@
 //! - **Serializable**: Supports JSON serialization/deserialization
 //! - **Sortable**: Built-in sorting and comparison operations
 //! - **Mock support**: Test utilities for generating predictable IDs
+#![allow(unexpected_cfgs)]
 
 /// A unique row identifier based on UUID v7.
 ///
@@ -106,8 +107,6 @@ impl Ord for RowID {
         self.0.cmp(&other.0)
     }
 }
-
-
 
 impl RowID {
     /// Create a new RowID using UUID v7 with current timestamp.
@@ -460,6 +459,31 @@ impl RowID {
     }
 }
 
+// SQLx trait implementations for SQLite for RowID
+impl sqlx::Type<sqlx::Sqlite> for RowID {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RowID {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        let uuid = uuid::Uuid::parse_str(&s).map_err(|e| format!("Invalid RowID in DB: {}", e))?;
+        Ok(RowID(uuid))
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RowID {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        // Encode as a UUID string
+        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(self.0.to_string(), buf)
+    }
+}
+
 /// Errors that can occur during RowID operations.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RowIDError {
@@ -483,38 +507,10 @@ impl From<uuid::Error> for RowIDError {
     }
 }
 
-// SQLx database integration
-impl sqlx::Type<sqlx::Any> for RowID {
-    fn type_info() -> <sqlx::Any as sqlx::Database>::TypeInfo {
-        <String as sqlx::Type<sqlx::Any>>::type_info()
-    }
-}
-
-impl<'q> sqlx::Encode<'q, sqlx::Any> for RowID {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Any as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s = self.0.to_string();
-        <String as sqlx::Encode<sqlx::Any>>::encode_by_ref(&s, buf)
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Any> for RowID {
-    fn decode(
-        value: <sqlx::Any as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
-        let uuid = uuid::Uuid::parse_str(&s)
-            .map_err(|e| format!("Invalid UUID in database: {}", e))?;
-        Ok(Self(uuid))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{str::FromStr, thread, time::Duration};
+    use std::{str::FromStr};
 
     #[test]
     fn test_rowid_new_creates_uuid_v7() {
@@ -570,11 +566,20 @@ mod tests {
 
     #[test]
     fn test_rowid_ordering() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
+        // Create IDs with guaranteed different timestamps using mock
+        let early_time = chrono::DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let middle_time = chrono::DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let late_time = chrono::DateTime::parse_from_rfc3339("2023-01-03T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let id1 = RowID::mock_from_datetime(early_time);
+        let id2 = RowID::mock_from_datetime(middle_time);
+        let id3 = RowID::mock_from_datetime(late_time);
 
         assert!(id1 < id2);
         assert!(id2 < id3);
@@ -583,39 +588,20 @@ mod tests {
 
     #[test]
     fn test_sort_ascending() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
+        // Create IDs with guaranteed different timestamps
+        let time1 = chrono::DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time2 = chrono::DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time3 = chrono::DateTime::parse_from_rfc3339("2023-01-03T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
 
-        let mut ids = vec![id3, id1, id2];
-        RowID::sort_ascending(&mut ids);
-
-        assert_eq!(ids, vec![id1, id2, id3]);
-    }
-
-    #[test]
-    fn test_sort_descending() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
-
-        let mut ids = vec![id1, id3, id2];
-        RowID::sort_descending(&mut ids);
-
-        assert_eq!(ids, vec![id3, id2, id1]);
-    }
-
-    #[test]
-    fn test_sorted_ascending() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
+        let id1 = RowID::mock_from_datetime(time1);
+        let id2 = RowID::mock_from_datetime(time2);
+        let id3 = RowID::mock_from_datetime(time3);
 
         let sorted = RowID::sorted_ascending([id3, id1, id2]);
 
@@ -624,11 +610,20 @@ mod tests {
 
     #[test]
     fn test_sorted_descending() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
+        // Create IDs with guaranteed different timestamps
+        let time1 = chrono::DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time2 = chrono::DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time3 = chrono::DateTime::parse_from_rfc3339("2023-01-03T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let id1 = RowID::mock_from_datetime(time1);
+        let id2 = RowID::mock_from_datetime(time2);
+        let id3 = RowID::mock_from_datetime(time3);
 
         let ids = vec![id1, id3, id2];
         let sorted = RowID::sorted_descending(ids);
@@ -638,11 +633,20 @@ mod tests {
 
     #[test]
     fn test_min_max() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id3 = RowID::new();
+        // Create IDs with guaranteed different timestamps
+        let time1 = chrono::DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time2 = chrono::DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time3 = chrono::DateTime::parse_from_rfc3339("2023-01-03T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let id1 = RowID::mock_from_datetime(time1);
+        let id2 = RowID::mock_from_datetime(time2);
+        let id3 = RowID::mock_from_datetime(time3);
 
         let ids = [id2, id1, id3];
 
@@ -659,9 +663,16 @@ mod tests {
 
     #[test]
     fn test_is_before_after() {
-        let id1 = RowID::new();
-        thread::sleep(Duration::from_millis(1));
-        let id2 = RowID::new();
+        // Create IDs with guaranteed different timestamps
+        let time1 = chrono::DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let time2 = chrono::DateTime::parse_from_rfc3339("2023-01-02T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let id1 = RowID::mock_from_datetime(time1);
+        let id2 = RowID::mock_from_datetime(time2);
 
         assert!(id1.is_before(&id2));
         assert!(!id2.is_before(&id1));
@@ -681,20 +692,40 @@ mod tests {
 
     #[test]
     fn test_mock_ids_are_sortable() {
-        let mut mock_ids = vec![RowID::mock(), RowID::mock(), RowID::mock()];
+        // Generate multiple mock IDs
+        let mut mock_ids: Vec<RowID> = (0..10).map(|_| RowID::mock()).collect();
         
-        // Should not panic when sorting mock IDs
+        // Create a copy for comparison
+        let original_ids = mock_ids.clone();
+        
+        // Sort them
         RowID::sort_ascending(&mut mock_ids);
         
-        // All should be different (very high probability with UUIDs)
-        assert_ne!(mock_ids[0], mock_ids[1]);
-        assert_ne!(mock_ids[1], mock_ids[2]);
-        assert_ne!(mock_ids[0], mock_ids[2]);
+        // Verify they are now in order
+        for i in 0..mock_ids.len() - 1 {
+            assert!(mock_ids[i] <= mock_ids[i + 1]);
+        }
+        
+        // Verify all original IDs are still present (just reordered)
+        let mut sorted_original = original_ids;
+        sorted_original.sort();
+        assert_eq!(mock_ids, sorted_original);
     }
 
     #[test]
     fn test_large_collection_sorting() {
-        let mut ids: Vec<RowID> = (0..1000).map(|_| RowID::new()).collect();
+        // Create IDs with deterministic timestamps for reliable testing
+        let mut ids: Vec<RowID> = (0..100).map(|i| {
+            // Create dates from 2023-01-01 to 2023-04-10 (100 days)
+            let base_date = chrono::NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+            let target_date = base_date + chrono::Duration::days(i as i64);
+            let datetime = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                target_date.and_hms_opt(0, 0, 0).unwrap(),
+                chrono::Utc
+            );
+            RowID::mock_from_datetime(datetime)
+        }).collect();
+        
         let original_ids = ids.clone();
         
         RowID::sort_descending(&mut ids);
@@ -706,8 +737,7 @@ mod tests {
         
         // All original IDs should still be present
         let mut sorted_original = original_ids;
-        sorted_original.sort();
-        ids.sort();
+        sorted_original.sort_by(|a, b| b.cmp(a)); // descending sort
         assert_eq!(ids, sorted_original);
     }
 

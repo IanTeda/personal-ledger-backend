@@ -34,11 +34,9 @@
     Default,
     PartialEq,
     PartialOrd,
-    sqlx::Type,
     serde::Deserialize,
     serde::Serialize,
 )]
-#[sqlx(type_name = "category_type", rename_all = "lowercase")]
 pub enum CategoryTypes {
     /// Resources owned that have economic value (cash, investments, property).
     Asset,
@@ -63,6 +61,12 @@ pub enum CategoryTypesError {
     /// The provided string is not a valid category type.
     #[error("Invalid category type: {0}")]
     InvalidCategoryType(String),
+}
+
+impl std::fmt::Display for CategoryTypes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl std::str::FromStr for CategoryTypes {
@@ -142,137 +146,6 @@ impl CategoryTypes {
         ]
     }
 
-    /// Returns true if the category type is Asset.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use personal_ledger_backend::domain::CategoryTypes;
-    /// assert!(CategoryTypes::Asset.is_asset());
-    /// assert!(!CategoryTypes::Expense.is_asset());
-    /// ```
-    pub fn is_asset(&self) -> bool {
-        matches!(self, CategoryTypes::Asset)
-    }
-
-    /// Returns true if the category type is Liability.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use personal_ledger_backend::domain::CategoryTypes;
-    /// assert!(CategoryTypes::Liability.is_liability());
-    /// assert!(!CategoryTypes::Asset.is_liability());
-    /// ```
-    pub fn is_liability(&self) -> bool {
-        matches!(self, CategoryTypes::Liability)
-    }
-
-    /// Returns true if the category type is Income.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use personal_ledger_backend::domain::CategoryTypes;
-    /// assert!(CategoryTypes::Income.is_income());
-    /// assert!(!CategoryTypes::Expense.is_income());
-    /// ```
-    pub fn is_income(&self) -> bool {
-        matches!(self, CategoryTypes::Income)
-    }
-
-    /// Returns true if the category type is Expense.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use personal_ledger_backend::domain::CategoryTypes;
-    /// assert!(CategoryTypes::Expense.is_expense());
-    /// assert!(!CategoryTypes::Income.is_expense());
-    /// ```
-    pub fn is_expense(&self) -> bool {
-        matches!(self, CategoryTypes::Expense)
-    }
-
-    /// Returns true if the category type is Equity.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use personal_ledger_backend::domain::CategoryTypes;
-    /// assert!(CategoryTypes::Equity.is_equity());
-    /// assert!(!CategoryTypes::Asset.is_equity());
-    /// ```
-    pub fn is_equity(&self) -> bool {
-        matches!(self, CategoryTypes::Equity)
-    }
-
-    /// Returns true if the category type represents a debit balance in normal accounting.
-    ///
-    /// Assets and Expenses normally have debit balances.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use personal_ledger_backend::domain::CategoryTypes;
-    ///
-    /// assert!(CategoryTypes::Asset.is_debit_normal());
-    /// assert!(CategoryTypes::Expense.is_debit_normal());
-    /// assert!(!CategoryTypes::Income.is_debit_normal());
-    /// ```
-    pub fn is_debit_normal(&self) -> bool {
-        matches!(self, CategoryTypes::Asset | CategoryTypes::Expense)
-    }
-
-    /// Returns true if the category type represents a credit balance in normal accounting.
-    ///
-    /// Liabilities, Income, and Equity normally have credit balances.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use personal_ledger_backend::domain::CategoryTypes;
-    ///
-    /// assert!(CategoryTypes::Liability.is_credit_normal());
-    /// assert!(CategoryTypes::Income.is_credit_normal());
-    /// assert!(!CategoryTypes::Asset.is_credit_normal());
-    /// ```
-    pub fn is_credit_normal(&self) -> bool {
-        matches!(self, CategoryTypes::Liability | CategoryTypes::Income | CategoryTypes::Equity)
-    }
-
-    /// Returns true if the category affects the balance sheet.
-    ///
-    /// Assets, Liabilities, and Equity appear on the balance sheet.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use personal_ledger_backend::domain::CategoryTypes;
-    ///
-    /// assert!(CategoryTypes::Asset.is_balance_sheet());
-    /// assert!(!CategoryTypes::Income.is_balance_sheet());
-    /// ```
-    pub fn is_balance_sheet(&self) -> bool {
-        matches!(self, CategoryTypes::Asset | CategoryTypes::Liability | CategoryTypes::Equity)
-    }
-
-    /// Returns true if the category affects the income statement.
-    ///
-    /// Income and Expense categories appear on the income statement.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use personal_ledger_backend::domain::CategoryTypes;
-    ///
-    /// assert!(CategoryTypes::Income.is_income_statement());
-    /// assert!(!CategoryTypes::Asset.is_income_statement());
-    /// ```
-    pub fn is_income_statement(&self) -> bool {
-        matches!(self, CategoryTypes::Income | CategoryTypes::Expense)
-    }
-
     /// Create a random CategoryTypes variant for testing.
     ///
     /// This method randomly selects one of the five category types using
@@ -306,6 +179,31 @@ impl CategoryTypes {
 impl sqlx::Type<sqlx::Any> for CategoryTypes {
     fn type_info() -> sqlx::any::AnyTypeInfo {
         <String as sqlx::Type<sqlx::Any>>::type_info()
+    }
+}
+
+// Also provide Sqlite-specific trait impls so the query_as! macro can resolve
+// types for the sqlite driver at compile time.
+impl sqlx::Type<sqlx::Sqlite> for CategoryTypes {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for CategoryTypes {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        use std::str::FromStr;
+        Ok(CategoryTypes::from_str(&s).map_err(|e| format!("Invalid category type in DB: {}", e))?)
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for CategoryTypes {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(self.as_str().to_string(), buf)
     }
 }
 
@@ -438,87 +336,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_asset() {
-        assert!(CategoryTypes::Asset.is_asset());
-        assert!(!CategoryTypes::Liability.is_asset());
-        assert!(!CategoryTypes::Income.is_asset());
-        assert!(!CategoryTypes::Expense.is_asset());
-        assert!(!CategoryTypes::Equity.is_asset());
-    }
-
-    #[test]
-    fn test_is_liability() {
-        assert!(!CategoryTypes::Asset.is_liability());
-        assert!(CategoryTypes::Liability.is_liability());
-        assert!(!CategoryTypes::Income.is_liability());
-        assert!(!CategoryTypes::Expense.is_liability());
-        assert!(!CategoryTypes::Equity.is_liability());
-    }
-
-    #[test]
-    fn test_is_income() {
-        assert!(!CategoryTypes::Asset.is_income());
-        assert!(!CategoryTypes::Liability.is_income());
-        assert!(CategoryTypes::Income.is_income());
-        assert!(!CategoryTypes::Expense.is_income());
-        assert!(!CategoryTypes::Equity.is_income());
-    }
-
-    #[test]
-    fn test_is_expense() {
-        assert!(!CategoryTypes::Asset.is_expense());
-        assert!(!CategoryTypes::Liability.is_expense());
-        assert!(!CategoryTypes::Income.is_expense());
-        assert!(CategoryTypes::Expense.is_expense());
-        assert!(!CategoryTypes::Equity.is_expense());
-    }
-
-    #[test]
-    fn test_is_equity() {
-        assert!(!CategoryTypes::Asset.is_equity());
-        assert!(!CategoryTypes::Liability.is_equity());
-        assert!(!CategoryTypes::Income.is_equity());
-        assert!(!CategoryTypes::Expense.is_equity());
-        assert!(CategoryTypes::Equity.is_equity());
-    }
-
-    #[test]
-    fn test_is_debit_normal() {
-        assert!(CategoryTypes::Asset.is_debit_normal());
-        assert!(!CategoryTypes::Liability.is_debit_normal());
-        assert!(!CategoryTypes::Income.is_debit_normal());
-        assert!(CategoryTypes::Expense.is_debit_normal());
-        assert!(!CategoryTypes::Equity.is_debit_normal());
-    }
-
-    #[test]
-    fn test_is_credit_normal() {
-        assert!(!CategoryTypes::Asset.is_credit_normal());
-        assert!(CategoryTypes::Liability.is_credit_normal());
-        assert!(CategoryTypes::Income.is_credit_normal());
-        assert!(!CategoryTypes::Expense.is_credit_normal());
-        assert!(CategoryTypes::Equity.is_credit_normal());
-    }
-
-    #[test]
-    fn test_is_balance_sheet() {
-        assert!(CategoryTypes::Asset.is_balance_sheet());
-        assert!(CategoryTypes::Liability.is_balance_sheet());
-        assert!(!CategoryTypes::Income.is_balance_sheet());
-        assert!(!CategoryTypes::Expense.is_balance_sheet());
-        assert!(CategoryTypes::Equity.is_balance_sheet());
-    }
-
-    #[test]
-    fn test_is_income_statement() {
-        assert!(!CategoryTypes::Asset.is_income_statement());
-        assert!(!CategoryTypes::Liability.is_income_statement());
-        assert!(CategoryTypes::Income.is_income_statement());
-        assert!(CategoryTypes::Expense.is_income_statement());
-        assert!(!CategoryTypes::Equity.is_income_statement());
-    }
-
-    #[test]
     fn test_default() {
         assert_eq!(CategoryTypes::default(), CategoryTypes::Expense);
     }
@@ -542,43 +359,6 @@ mod tests {
             // Test deserialization round-trip
             let deserialized: CategoryTypes = serde_json::from_str(&serialized).unwrap();
             assert_eq!(deserialized, category_type);
-        }
-    }
-
-    #[test]
-    fn test_accounting_equation_helpers() {
-        // Assets = Liabilities + Equity (balance sheet items)
-        assert!(CategoryTypes::Asset.is_balance_sheet());
-        assert!(CategoryTypes::Liability.is_balance_sheet());
-        assert!(CategoryTypes::Equity.is_balance_sheet());
-        
-        // Income and Expenses affect the income statement
-        assert!(CategoryTypes::Income.is_income_statement());
-        assert!(CategoryTypes::Expense.is_income_statement());
-        
-        // Debit/Credit normal balances
-        assert!(CategoryTypes::Asset.is_debit_normal());
-        assert!(CategoryTypes::Expense.is_debit_normal());
-        assert!(CategoryTypes::Liability.is_credit_normal());
-        assert!(CategoryTypes::Income.is_credit_normal());
-        assert!(CategoryTypes::Equity.is_credit_normal());
-    }
-
-    #[test]
-    fn test_comprehensive_coverage() {
-        // Test that all variants are covered in our functions
-        for category_type in CategoryTypes::all() {
-            // Every type should have a string representation
-            assert!(!category_type.as_str().is_empty());
-            
-            // Every type should be parseable from its string representation
-            assert_eq!(CategoryTypes::from_str(category_type.as_str()), Ok(category_type.clone()));
-            
-            // Every type should be either debit or credit normal (but not both)
-            assert_ne!(category_type.is_debit_normal(), category_type.is_credit_normal());
-            
-            // Every type should be either balance sheet or income statement (but not both)
-            assert_ne!(category_type.is_balance_sheet(), category_type.is_income_statement());
         }
     }
 

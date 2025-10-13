@@ -102,6 +102,9 @@ Eagerly implement common traits where appropriate:
 - Write comprehensive unit tests using `#[cfg(test)]` modules and `#[test]` annotations.
 - Use test modules alongside the code they test (`mod tests { ... }`).
 - Write integration tests in `tests/` directory with descriptive filenames.
+- Use the `fake` crate to generate random, realistic test data for comprehensive test coverage.
+- Generate test data with deterministic seeds when reproducibility is important.
+- Leverage `fake` crate's `Fake` trait and derive macros for generating random instances of custom types.
 - Write clear and concise comments for each function, struct, enum, and complex logic.
 - Ensure functions have descriptive names and include comprehensive documentation.
 - Document all public APIs with rustdoc (`///` comments) following the [API Guidelines](https://rust-lang.github.io/api-guidelines/).
