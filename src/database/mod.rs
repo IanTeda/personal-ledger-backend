@@ -69,3 +69,6 @@ mod pool;
 ///
 /// See [`pool`] module for detailed API documentation and examples.
 pub use pool::DatabasePool;
+
+mod categories;
+pub use categories::Category;
