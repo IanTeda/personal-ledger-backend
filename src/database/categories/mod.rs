@@ -13,7 +13,8 @@
 //! - [`model`] - Submodule containing the `Category` struct and related types
 //! - [`Category`] - The main category model with builder pattern support
 
-mod insert;
-
 pub mod model;
 pub use model::Category;
+
+
+mod insert;

@@ -72,7 +72,8 @@ use crate::domain;
 /// - `is_active`: Visibility flag for new transactions (preserves historical data)
 /// - `created_on`: UTC timestamp of initial creation
 /// - `updated_on`: UTC timestamp of last modification
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, sqlx::FromRow)]
+#[serde(rename_all = "snake_case")]
 pub struct Category {
     /// Unique time-ordered identifier for the category.
     ///
@@ -137,37 +138,6 @@ pub struct Category {
     ///
     /// Updated automatically whenever any field is changed.
     pub updated_on: chrono::DateTime<chrono::Utc>,
-}
-
-// Manual FromRow implementation to handle DateTime<Utc> conversion from String
-impl<'r> sqlx::FromRow<'r, sqlx::any::AnyRow> for Category {
-    fn from_row(row: &'r sqlx::any::AnyRow) -> Result<Self, sqlx::Error> {
-        use sqlx::Row;
-        
-        let created_on_str: String = row.try_get("created_on")?;
-        let updated_on_str: String = row.try_get("updated_on")?;
-        
-        let created_on = chrono::DateTime::parse_from_rfc3339(&created_on_str)
-            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?
-            .with_timezone(&chrono::Utc);
-        let updated_on = chrono::DateTime::parse_from_rfc3339(&updated_on_str)
-            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?
-            .with_timezone(&chrono::Utc);
-
-        Ok(Category {
-            id: row.try_get("id")?,
-            code: row.try_get("code")?,
-            name: row.try_get("name")?,
-            description: row.try_get("description")?,
-            slug: row.try_get("slug")?,
-            category_type: row.try_get("category_type")?,
-            color: row.try_get("color")?,
-            icon: row.try_get("icon")?,
-            is_active: row.try_get("is_active")?,
-            created_on,
-            updated_on,
-        })
-    }
 }
 
 impl Category {

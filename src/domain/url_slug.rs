@@ -41,12 +41,15 @@ pub enum UrlSlugError {
     /// The slug contains invalid characters (only lowercase letters, numbers, and hyphens allowed).
     #[error("Invalid slug characters: {0}")]
     InvalidCharacters(String),
+
     /// The slug is empty.
     #[error("Slug cannot be empty")]
     EmptySlug,
+
     /// The slug starts or ends with a hyphen.
     #[error("Slug cannot start or end with hyphen: {0}")]
     StartsOrEndsWithHyphen(String),
+    
     /// The slug contains consecutive hyphens.
     #[error("Slug cannot contain consecutive hyphens: {0}")]
     ConsecutiveHyphens(String),
@@ -251,20 +254,7 @@ impl From<&str> for UrlSlug {
     }
 }
 
-// SQLx trait implementations for database integration
-impl sqlx::Type<sqlx::Postgres> for UrlSlug {
-    fn type_info() -> sqlx::postgres::PgTypeInfo {
-        <String as sqlx::Type<sqlx::Postgres>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Postgres> for UrlSlug {
-    fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
-        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
-    }
-}
-
+// SQLx trait implementations for SQLite
 impl sqlx::Type<sqlx::Sqlite> for UrlSlug {
     fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
         <String as sqlx::Type<sqlx::Sqlite>>::type_info()
@@ -274,29 +264,16 @@ impl sqlx::Type<sqlx::Sqlite> for UrlSlug {
 impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for UrlSlug {
     fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
+        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid slug in database: {}", e))?)
     }
 }
 
-impl sqlx::Type<sqlx::Any> for UrlSlug {
-    fn type_info() -> sqlx::any::AnyTypeInfo {
-        <String as sqlx::Type<sqlx::Any>>::type_info()
-    }
-}
-
-impl<'q> sqlx::Encode<'q, sqlx::Any> for UrlSlug {
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for UrlSlug {
     fn encode_by_ref(
         &self,
-        buf: &mut <sqlx::Any as sqlx::Database>::ArgumentBuffer<'q>,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        <String as sqlx::Encode<sqlx::Any>>::encode_by_ref(&self.0, buf)
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Any> for UrlSlug {
-    fn decode(value: sqlx::any::AnyValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Any>>::decode(value)?;
-        Ok(UrlSlug::parse(s).map_err(|e| format!("Invalid URL slug in database: {}", e))?)
+        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(self.0.clone(), buf)
     }
 }
 
@@ -463,6 +440,25 @@ mod tests {
 
     #[test]
     fn test_complex_parsing() {
+        use fake::Fake;
+        use fake::faker::lorem::en::Sentence;
+
+        // Test with Fake-generated sentences
+        for _ in 0..20 {
+            let sentence: String = Sentence(3..10).fake();
+            let slug = UrlSlug::parse(&sentence).unwrap();
+            
+            // Verify the slug is valid
+            assert!(!slug.is_empty());
+            assert!(UrlSlug::new(slug.as_str()).is_ok());
+            
+            // Verify it contains only valid characters
+            for c in slug.as_str().chars() {
+                assert!(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+            }
+        }
+
+        // Test with some hardcoded cases for specific transformations
         let test_cases = vec![
             ("Hello World!", "hello-world"),
             ("C++ & Rust Programming", "c-rust-programming"),
@@ -480,6 +476,20 @@ mod tests {
 
     #[test]
     fn test_edge_cases() {
+        use fake::Fake;
+        use fake::faker::lorem::en::Word;
+
+        // Test with Fake-generated words
+        for _ in 0..10 {
+            let word: String = Word().fake();
+            let slug = UrlSlug::parse(&word).unwrap();
+            
+            // Single words should become lowercase
+            assert_eq!(slug.as_str(), word.to_lowercase());
+            assert!(UrlSlug::new(slug.as_str()).is_ok());
+        }
+
+        // Specific edge cases
         // Single character
         let slug = UrlSlug::parse("a").unwrap();
         assert_eq!(slug.as_str(), "a");
@@ -495,5 +505,110 @@ mod tests {
         // Already valid slug
         let slug = UrlSlug::parse("already-valid-slug").unwrap();
         assert_eq!(slug.as_str(), "already-valid-slug");
+    }
+
+    #[test]
+    fn test_is_empty_and_len() {
+        let slug = UrlSlug::new("test-slug").unwrap();
+        assert!(!slug.is_empty());
+        assert_eq!(slug.len(), 9); // "test-slug" is 9 characters
+
+        let short_slug = UrlSlug::new("a").unwrap();
+        assert!(!short_slug.is_empty());
+        assert_eq!(short_slug.len(), 1);
+
+        let long_slug = UrlSlug::new("very-long-slug-with-many-characters").unwrap();
+        assert!(!long_slug.is_empty());
+        assert_eq!(long_slug.len(), 35);
+    }
+
+    #[test]
+    fn test_hash_consistency() {
+        use std::collections::HashMap;
+
+        let slug1 = UrlSlug::new("test-slug").unwrap();
+        let slug2 = UrlSlug::new("test-slug").unwrap();
+        let slug3 = UrlSlug::new("different-slug").unwrap();
+
+        // Equal slugs should have equal hashes
+        let mut map = HashMap::new();
+        map.insert(slug1.clone(), "value1");
+        map.insert(slug2.clone(), "value2"); // Should overwrite value1
+        
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get(&slug1), Some(&"value2"));
+        
+        // Different slugs should have different entries
+        map.insert(slug3.clone(), "value3");
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get(&slug3), Some(&"value3"));
+    }
+
+    #[test]
+    fn test_error_messages() {
+        // Test specific error messages
+        let err = UrlSlug::new("INVALID").unwrap_err();
+        assert!(matches!(err, UrlSlugError::InvalidCharacters(_)));
+        assert!(err.to_string().contains("INVALID"));
+
+        let err = UrlSlug::new("-starts-with-hyphen").unwrap_err();
+        assert!(matches!(err, UrlSlugError::StartsOrEndsWithHyphen(_)));
+        assert!(err.to_string().contains("-starts-with-hyphen"));
+
+        let err = UrlSlug::new("ends-with-hyphen-").unwrap_err();
+        assert!(matches!(err, UrlSlugError::StartsOrEndsWithHyphen(_)));
+        assert!(err.to_string().contains("ends-with-hyphen-"));
+
+        let err = UrlSlug::new("consecutive--hyphens").unwrap_err();
+        assert!(matches!(err, UrlSlugError::ConsecutiveHyphens(_)));
+        assert!(err.to_string().contains("consecutive--hyphens"));
+
+        let err = UrlSlug::parse("").unwrap_err();
+        assert!(matches!(err, UrlSlugError::EmptySlug));
+        assert_eq!(err.to_string(), "Slug cannot be empty");
+    }
+
+    #[test]
+    fn test_parse_with_fake_generated_strings() {
+        use fake::Fake;
+        use fake::faker::lorem::en::Sentence;
+
+        // Generate various strings and test parsing
+        for _ in 0..50 {
+            let sentence: String = Sentence(1..5).fake();
+            
+            // All sentences should parse successfully (they contain letters/spaces)
+            let slug_result = UrlSlug::parse(&sentence);
+            assert!(slug_result.is_ok(), "Failed to parse: {}", sentence);
+            
+            let slug = slug_result.unwrap();
+            
+            // Verify the result is a valid slug
+            assert!(!slug.is_empty());
+            assert!(UrlSlug::new(slug.as_str()).is_ok());
+            
+            // Verify no consecutive hyphens
+            assert!(!slug.as_str().contains("--"));
+            
+            // Verify no leading/trailing hyphens
+            assert!(!slug.as_str().starts_with('-'));
+            assert!(!slug.as_str().ends_with('-'));
+        }
+    }
+
+    #[test]
+    fn test_new_with_fake_generated_valid_slugs() {
+        use fake::Fake;
+        use fake::faker::lorem::en::Word;
+
+        // Generate valid slugs by parsing words and using the result
+        for _ in 0..30 {
+            let word: String = Word().fake();
+            let parsed_slug = UrlSlug::parse(&word).unwrap();
+            
+            // The parsed result should be valid for new()
+            let new_slug = UrlSlug::new(parsed_slug.as_str()).unwrap();
+            assert_eq!(new_slug, parsed_slug);
+        }
     }
 }
