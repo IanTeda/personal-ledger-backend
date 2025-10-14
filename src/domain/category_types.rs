@@ -41,18 +41,18 @@ pub enum CategoryTypes {
     /// Resources owned that have economic value (cash, investments, property).
     Asset,
 
-    /// Debts or obligations owed to others (loans, credit cards, mortgages).
-    Liability,
+    /// Owner's Capital, Owner's Drawings (Withdrawals), Retained Earnings, Common Stock
+    Equity,
 
-    /// Money earned or received (salary, dividends, interest, sales).
-    Income,
-    
     /// Money spent or costs incurred (groceries, utilities, entertainment).
     #[default]
     Expense,
 
-    /// Owner's residual interest in assets after deducting liabilities.
-    Equity,
+    /// Money earned or received (salary, dividends, interest, sales).
+    Income,
+
+    /// Debts or obligations owed to others (loans, credit cards, mortgages).
+    Liability,
 }
 
 /// Error type for CategoryTypes parsing operations.

@@ -9,6 +9,7 @@ pub struct Category {
     pub name: String,
     pub description: Option<String>,
     pub url_slug: Option<domain::UrlSlug>,
+    pub category_type: domain::CategoryTypes,
     pub is_active: bool,
     pub created_on: chrono::DateTime<chrono::Utc>,
     pub updated_on: chrono::DateTime<chrono::Utc>,
@@ -27,6 +28,8 @@ impl database::Category {
 
         let url_slug: Option<domain::UrlSlug> = Some(domain::UrlSlug::from(name.clone()));
 
+        let category_type = domain::CategoryTypes::mock();
+
         let is_active: bool = true;
 
         let created_on: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
@@ -39,6 +42,7 @@ impl database::Category {
             name,
             description,
             url_slug,
+            category_type,
             is_active,
             created_on,
             updated_on,

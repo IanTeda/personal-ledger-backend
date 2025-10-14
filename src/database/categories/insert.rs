@@ -12,6 +12,7 @@ impl database::Category {
             name = % self.name,
             description = ? self.description,
             url_slug = ? self.url_slug,
+            category_type = % self.category_type,
             is_active = % self.is_active,
             created_on = % self.created_on,
             updated_on = % self.updated_on,
@@ -22,14 +23,15 @@ impl database::Category {
         // `RETURNING *` for compile-time checked macros. Execute the insert first.
         let insert_query = sqlx::query!(
             r#"
-                INSERT INTO categories (id, code, name, description, url_slug, is_active, created_on, updated_on)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO categories (id, code, name, description, url_slug, category_type, is_active, created_on, updated_on)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             self.id,
             self.code,
             self.name,
             self.description,
             self.url_slug,
+            self.category_type,
             self.is_active,
             self.created_on,
             self.updated_on
@@ -50,6 +52,7 @@ impl database::Category {
                     name,
                     description,
                     url_slug    AS "url_slug?: domain::UrlSlug",
+                    category_type   As "category_type!: domain::CategoryTypes",
                     is_active,
                     created_on  AS "created_on!: chrono::DateTime<chrono::Utc>",
                     updated_on  AS "updated_on!: chrono::DateTime<chrono::Utc>"
