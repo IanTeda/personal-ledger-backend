@@ -1,6 +1,7 @@
 use crate::{database, domain};
 
 
+// TODO: Move code into a domain type
 #[derive(Debug, sqlx::FromRow, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
 pub struct Category {
     pub id: domain::RowID,
@@ -15,7 +16,7 @@ pub struct Category {
 impl database::Category {
     #[cfg(test)]
     pub fn mock() -> Self {
-        let now_id = domain::RowID::now();
+        let random_id = domain::RowID::mock();
 
         let code: String = "TEST.001.001".to_string();
 
@@ -30,7 +31,7 @@ impl database::Category {
         let updated_on: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
 
         Self {
-            id: now_id,
+            id: random_id,
             code,
             name,
             description,

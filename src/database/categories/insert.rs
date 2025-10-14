@@ -3,10 +3,22 @@ use crate::domain;
 
 
 impl database::Category {
+    #[tracing::instrument(
+        name = "Insert new Category into database: ",
+        skip(self, pool),
+        fields(
+            id = % self.id,
+            code = % self.code,
+            name = % self.name,
+            description = ? self.description,
+            is_active = % self.is_active,
+            created_on = % self.created_on,
+        ),
+    )]
     pub async fn insert(&self, pool: &sqlx::Pool<sqlx::Sqlite>) -> DatabaseResult<Self> {
         // 1) INSERT: SQLite uses `?` placeholders and does not reliably support
         // `RETURNING *` for compile-time checked macros. Execute the insert first.
-        sqlx::query!(
+        let insert_query = sqlx::query!(
             r#"
                 INSERT INTO categories (id, code, name, description, is_active, created_on, updated_on)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -18,9 +30,11 @@ impl database::Category {
             self.is_active,
             self.created_on,
             self.updated_on
-        )
-        .execute(pool)
-        .await?;
+        );
+
+        insert_query.execute(pool).await?;
+
+        tracing::info!("New Category inserted into the database.");
 
         // 2) SELECT: Read back the inserted row with explicit type annotations
         // for UUID and chrono types to avoid NULL/mapping issues in SQLite.
@@ -43,6 +57,8 @@ impl database::Category {
         .fetch_one(pool)
         .await?;
 
+        tracing::debug!("Newly created Category retrived from the database.");
+
         Ok(category)
     }
 }
@@ -59,27 +75,13 @@ pub mod tests {
         // Test inserting into database
     #[sqlx::test]
     async fn create_database_record(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let id = domain::RowID::now();
-        let code: String = "TEST.001.001".to_string();
-        let name: String = "Test Category".to_string();
-        let description: Option<String> = Some("This is a test category".to_string());
-        let is_active: bool = true;
-        let created_on: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-        let updated_on: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-
-        let new_category = database::Category {
-            id,
-            code,
-            name,
-            description,
-            is_active,
-            created_on,
-            updated_on,
-        };
+        let new_category = database::Category::mock();
 
         let database_record = new_category.insert(&pool).await?;
 
         assert_eq!(new_category, database_record);
+
+        // println!("Inserted category: {:?}", database_record);
 
         Ok(())
     }
