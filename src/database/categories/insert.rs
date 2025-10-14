@@ -11,8 +11,10 @@ impl database::Category {
             code = % self.code,
             name = % self.name,
             description = ? self.description,
+            url_slug = ? self.url_slug,
             is_active = % self.is_active,
             created_on = % self.created_on,
+            updated_on = % self.updated_on,
         ),
     )]
     pub async fn insert(&self, pool: &sqlx::Pool<sqlx::Sqlite>) -> DatabaseResult<Self> {
@@ -20,13 +22,14 @@ impl database::Category {
         // `RETURNING *` for compile-time checked macros. Execute the insert first.
         let insert_query = sqlx::query!(
             r#"
-                INSERT INTO categories (id, code, name, description, is_active, created_on, updated_on)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO categories (id, code, name, description, url_slug, is_active, created_on, updated_on)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             self.id,
             self.code,
             self.name,
             self.description,
+            self.url_slug,
             self.is_active,
             self.created_on,
             self.updated_on
@@ -46,6 +49,7 @@ impl database::Category {
                     code,
                     name,
                     description,
+                    url_slug,
                     is_active,
                     created_on  AS "created_on!: chrono::DateTime<chrono::Utc>",
                     updated_on  AS "updated_on!: chrono::DateTime<chrono::Utc>"
@@ -72,7 +76,7 @@ pub mod tests {
     pub type Result<T> = core::result::Result<T, Error>;
     pub type Error = Box<dyn std::error::Error>;
 
-        // Test inserting into database
+    // Test inserting into database
     #[sqlx::test]
     async fn create_database_record(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         let new_category = database::Category::mock();
@@ -81,7 +85,7 @@ pub mod tests {
 
         assert_eq!(new_category, database_record);
 
-        // println!("Inserted category: {:?}", database_record);
+        println!("Inserted category: {:?}", database_record);
 
         Ok(())
     }
