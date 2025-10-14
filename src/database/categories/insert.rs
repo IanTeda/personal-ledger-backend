@@ -1,4 +1,6 @@
 use crate::database::{self, DatabaseResult};
+use crate::domain;
+
 
 impl database::Category {
     pub async fn insert(&self, pool: &sqlx::Pool<sqlx::Sqlite>) -> DatabaseResult<Self> {
@@ -26,7 +28,7 @@ impl database::Category {
             database::Category,
             r#"
                 SELECT
-                    id          AS "id!: uuid::Uuid",
+                    id          AS "id!: domain::RowID",
                     code,
                     name,
                     description,
@@ -57,7 +59,7 @@ pub mod tests {
         // Test inserting into database
     #[sqlx::test]
     async fn create_database_record(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let id = uuid::Uuid::now_v7();
+        let id = domain::RowID::now();
         let code: String = "TEST.001.001".to_string();
         let name: String = "Test Category".to_string();
         let description: Option<String> = Some("This is a test category".to_string());

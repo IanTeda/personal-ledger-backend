@@ -11,7 +11,6 @@
 //! - **Serializable**: Supports JSON serialization/deserialization
 //! - **Sortable**: Built-in sorting and comparison operations
 //! - **Mock support**: Test utilities for generating predictable IDs
-#![allow(unexpected_cfgs)]
 
 /// A unique row identifier based on UUID v7.
 ///
@@ -37,6 +36,31 @@
     Debug, Copy, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
 )]
 pub struct RowID(uuid::Uuid);
+
+/// SQLx trait implementations for SQLite for RowID
+impl sqlx::Type<sqlx::Sqlite> for RowID {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RowID {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        let uuid = uuid::Uuid::parse_str(&s).map_err(|e| format!("Invalid RowID in DB: {}", e))?;
+        Ok(RowID(uuid))
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RowID {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        let s = self.0.to_string();
+        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(s, buf)
+    }
+}
 
 impl TryFrom<uuid::Uuid> for RowID {
     type Error = RowIDError;
@@ -123,7 +147,7 @@ impl RowID {
     /// let id2 = RowID::new();
     /// assert!(id1 < id2); // id1 was created before id2
     /// ```
-    pub fn new() -> Self {
+    pub fn now() -> Self {
         let row_id = uuid::Uuid::now_v7();
         Self(row_id)
     }
@@ -459,31 +483,6 @@ impl RowID {
     }
 }
 
-// SQLx trait implementations for SQLite for RowID
-impl sqlx::Type<sqlx::Sqlite> for RowID {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RowID {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        let uuid = uuid::Uuid::parse_str(&s).map_err(|e| format!("Invalid RowID in DB: {}", e))?;
-        Ok(RowID(uuid))
-    }
-}
-
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RowID {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        // Encode as a UUID string
-        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(self.0.to_string(), buf)
-    }
-}
-
 /// Errors that can occur during RowID operations.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RowIDError {
@@ -514,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_rowid_new_creates_uuid_v7() {
-        let row_id = RowID::new();
+        let row_id = RowID::now();
         // UUID v7 has version 7
         assert_eq!(row_id.0.get_version_num(), 7);
     }
@@ -527,14 +526,14 @@ mod tests {
 
     #[test]
     fn test_rowid_equality() {
-        let row_id1 = RowID::new();
+        let row_id1 = RowID::now();
         let row_id2 = RowID(row_id1.0);
         assert_eq!(row_id1, row_id2);
     }
 
     #[test]
     fn test_rowid_serialization() {
-        let row_id = RowID::new();
+        let row_id = RowID::now();
         let serialized = serde_json::to_string(&row_id).unwrap();
         let deserialized: RowID = serde_json::from_str(&serialized).unwrap();
         assert_eq!(row_id, deserialized);
@@ -682,7 +681,7 @@ mod tests {
 
     #[test]
     fn test_equality() {
-        let id = RowID::new();
+        let id = RowID::now();
         let same_id = RowID(id.0);
 
         assert!(!(id.is_before(&same_id)));
@@ -789,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_as_uuid() {
-        let row_id = RowID::new();
+        let row_id = RowID::now();
         let uuid_ref = row_id.as_uuid();
         assert_eq!(*uuid_ref, row_id.0);
         assert_eq!(uuid_ref.get_version_num(), 7);
