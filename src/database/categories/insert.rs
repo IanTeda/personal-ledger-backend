@@ -49,7 +49,7 @@ impl database::Category {
                     code,
                     name,
                     description,
-                    url_slug,
+                    url_slug    AS "url_slug?: domain::UrlSlug",
                     is_active,
                     created_on  AS "created_on!: chrono::DateTime<chrono::Utc>",
                     updated_on  AS "updated_on!: chrono::DateTime<chrono::Utc>"

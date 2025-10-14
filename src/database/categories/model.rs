@@ -8,7 +8,7 @@ pub struct Category {
     pub code: String,
     pub name: String,
     pub description: Option<String>,
-    pub url_slug: Option<String>,
+    pub url_slug: Option<domain::UrlSlug>,
     pub is_active: bool,
     pub created_on: chrono::DateTime<chrono::Utc>,
     pub updated_on: chrono::DateTime<chrono::Utc>,
@@ -25,7 +25,7 @@ impl database::Category {
 
         let description: Option<String> = Some("This is a test category".to_string());
 
-        let url_slug: Option<String> = Some("test-category".to_string());
+        let url_slug: Option<domain::UrlSlug> = Some(domain::UrlSlug::from(name.clone()));
 
         let is_active: bool = true;
 
