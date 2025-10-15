@@ -12,6 +12,7 @@
 //! - [`CategoryTypes`] - Classification types for financial transactions
 //! - [`RowID`] - Time-ordered UUID v7 identifiers for database rows
 //! - [`UrlSlug`] - URL-safe identifiers for web-friendly resource names
+//! - [`HexColor`] - Validated hexadecimal RGB colour representation
 //!
 //! ## Design Principles
 //!
@@ -51,3 +52,12 @@ mod url_slug;
 /// throughout the application for creating readable URLs and resource names
 /// that are both user-friendly and search engine optimized.
 pub use url_slug::{UrlSlug, UrlSlugError};
+
+mod hex_color;
+/// Hexadecimal RGB colour type for validated colour values.
+///
+/// [`HexColor`] guarantees colours remain in canonical `#RRGGBB` format while
+/// providing convenient access to individual RGB channels. Useful for
+/// theming, categorisation, and any feature that requires precise colour
+/// handling across the application.
+pub use hex_color::{HexColor, HexColorError};

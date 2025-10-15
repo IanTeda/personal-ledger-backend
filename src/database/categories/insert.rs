@@ -13,6 +13,8 @@ impl database::Category {
             description = ? self.description,
             url_slug = ? self.url_slug,
             category_type = % self.category_type,
+            color = ? self.color,
+            icon = ? self.icon,
             is_active = % self.is_active,
             created_on = % self.created_on,
             updated_on = % self.updated_on,
@@ -23,8 +25,8 @@ impl database::Category {
         // `RETURNING *` for compile-time checked macros. Execute the insert first.
         let insert_query = sqlx::query!(
             r#"
-                INSERT INTO categories (id, code, name, description, url_slug, category_type, is_active, created_on, updated_on)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO categories (id, code, name, description, url_slug, category_type, color, icon, is_active, created_on, updated_on)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             self.id,
             self.code,
@@ -32,6 +34,8 @@ impl database::Category {
             self.description,
             self.url_slug,
             self.category_type,
+            self.color,
+            self.icon,
             self.is_active,
             self.created_on,
             self.updated_on
@@ -47,15 +51,17 @@ impl database::Category {
             database::Category,
             r#"
                 SELECT
-                    id          AS "id!: domain::RowID",
+                    id              AS "id!: domain::RowID",
                     code,
                     name,
                     description,
-                    url_slug    AS "url_slug?: domain::UrlSlug",
-                    category_type   As "category_type!: domain::CategoryTypes",
-                    is_active,
-                    created_on  AS "created_on!: chrono::DateTime<chrono::Utc>",
-                    updated_on  AS "updated_on!: chrono::DateTime<chrono::Utc>"
+                    url_slug        AS "url_slug?: domain::UrlSlug",
+                    category_type   AS "category_type!: domain::CategoryTypes",
+                    color           AS "color?: domain::HexColor",
+                    icon,
+                    is_active       AS "is_active!: bool",
+                    created_on      AS "created_on!: chrono::DateTime<chrono::Utc>",
+                    updated_on      AS "updated_on!: chrono::DateTime<chrono::Utc>"
                 FROM categories
                 WHERE id = ?
             "#,
