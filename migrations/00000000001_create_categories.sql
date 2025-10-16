@@ -1,23 +1,33 @@
 -- Migration: create categories table and supporting constraints
---
--- Keep the migration portable across Postgres and SQLite by avoiding
--- Postgres-only features (ENUM types and PL/pgSQL triggers). Store
--- `category_type` as TEXT and validate allowed values with a CHECK
--- constraint. Use CURRENT_TIMESTAMP for defaults which works on both DBs.
 
 CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     description TEXT,
-    slug TEXT UNIQUE,
-    category_type TEXT NOT NULL CHECK (category_type IN ('asset','liability','income','expense','equity')),
+    url_slug TEXT UNIQUE,
+    category_type TEXT NOT NULL CHECK (category_type IN ('asset', 'equity', 'expense', 'income', 'liability')),
     color TEXT CHECK (color IS NULL OR (length(color) = 7 AND substr(color,1,1) = '#')),
     icon TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_on TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_on TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_on TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_on TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_code_lower ON categories (LOWER(code));
 
+-- Cover frequent lookups by type/active flag and ordering by creation/update timestamps
+CREATE INDEX IF NOT EXISTS idx_categories_type_active ON categories(category_type, is_active);
+CREATE INDEX IF NOT EXISTS idx_categories_created_on ON categories(created_on DESC);
+CREATE INDEX IF NOT EXISTS idx_categories_updated_on ON categories(updated_on DESC);
+
+
+-- Trigger to modify the the updated_on row after upate to categoryies row
+CREATE TRIGGER IF NOT EXISTS trg_categories_set_updated_on
+AFTER UPDATE ON categories
+FOR EACH ROW
+WHEN NEW.updated_on = OLD.updated_on
+BEGIN
+    UPDATE categories
+    SET updated_on = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    WHERE rowid = NEW.rowid;
+END;

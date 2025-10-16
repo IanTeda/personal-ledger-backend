@@ -15,9 +15,6 @@
 !.vscode
 !.gitmodules
 !.env.example
-!.cargo
-!.cargo/config.toml
-!.cargo/config
 !.mdbook-ignore
 !.editorconfig
 

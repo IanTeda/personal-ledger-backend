@@ -1,20 +1,22 @@
 //! # Categories Database Module
 //!
-//! This module provides database models and operations for financial categories
-//! in the Personal Ledger backend system.
-//!
-//! Categories are fundamental to the accounting system, providing classification
-//! for transactions and accounts according to standard accounting principles.
-//! They support the five main accounting categories: assets, liabilities, income,
-//! expenses, and equity.
-//!
-//! ## Module Structure
-//!
-//! - [`model`] - Submodule containing the `Category` struct and related types
-//! - [`Category`] - The main category model with builder pattern support
+//! Provides data access helpers, builders, and models for working with
+//! category records in the persistence layer. The module exposes the
+//! database representation of a category alongside utilities for creating
+//! and inserting records during tests or data seeding.
 
-pub mod model;
+// #![allow(unused)] // For development only
+
+mod builder;
+mod model;
+mod insert;
+mod update;
+mod delete;
+mod find;
+
+/// Database row model representing a persisted category.
 pub use model::Category;
 
-
-mod insert;
+/// Fluent builder for constructing `Category` instances in tests and fixtures.
+#[cfg(test)]
+pub use builder::CategoriesBuilder;

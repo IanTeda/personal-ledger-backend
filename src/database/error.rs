@@ -12,6 +12,7 @@
 //! - `Migration`: Errors from running migrations
 //! - `Config`: Configuration errors during DB initialization
 //! - `Validation`: Domain validation errors (constraint violations, etc.)
+//! - `NotFound`: Resource not found errors
 //! - `Other`: Catch-all for miscellaneous DB errors
 //!
 //! ## Usage
@@ -68,6 +69,10 @@ pub enum DatabaseError {
     #[error("Validation: {0}")]
     Validation(String),
 
+    /// Resource not found errors
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     /// Generic catch-all for other database related errors
     #[error("Other database error: {0}")]
     Other(String),
@@ -122,6 +127,10 @@ mod tests {
         let val_err = DatabaseError::Validation("validation failed".to_string());
         assert!(matches!(val_err, DatabaseError::Validation(_)));
 
+        // Test NotFound variant
+        let not_found_err = DatabaseError::NotFound("record not found".to_string());
+        assert!(matches!(not_found_err, DatabaseError::NotFound(_)));
+
         // Test Other variant
         let other_err = DatabaseError::Other("other error".to_string());
         assert!(matches!(other_err, DatabaseError::Other(_)));
@@ -143,6 +152,9 @@ mod tests {
 
         let val_err = DatabaseError::Validation("test validation".to_string());
         assert_eq!(format!("{}", val_err), "Validation: test validation");
+
+        let not_found_err = DatabaseError::NotFound("test record".to_string());
+        assert_eq!(format!("{}", not_found_err), "Not found: test record");
 
         let other_err = DatabaseError::Other("test other".to_string());
         assert_eq!(format!("{}", other_err), "Other database error: test other");
