@@ -703,31 +703,6 @@ impl RowID {
     }
 }
 
-// SQLx trait implementations for SQLite for RowID
-impl sqlx::Type<sqlx::Sqlite> for RowID {
-    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
-        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
-    }
-}
-
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RowID {
-    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        let uuid = uuid::Uuid::parse_str(&s).map_err(|e| format!("Invalid RowID in DB: {}", e))?;
-        Ok(RowID(uuid))
-    }
-}
-
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RowID {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        // Encode as a UUID string
-        <String as sqlx::Encode<'q, sqlx::Sqlite>>::encode(self.0.to_string(), buf)
-    }
-}
-
 /// Errors that can occur during RowID operations.
 ///
 /// This enum covers all error cases for RowID creation, parsing, and validation.
