@@ -44,7 +44,7 @@ pub use proto::categories_service_server::{CategoriesService, CategoriesServiceS
 
 /// Message types for categories.
 pub use proto::{
-    Category, CategoryType,
+    Category, CategoryTypes,
     CategoryCreateRequest, CategoryCreateResponse,
     CategoryGetRequest, CategoryGetResponse,
     CategoryGetByCodeRequest, CategoryGetByCodeResponse,
