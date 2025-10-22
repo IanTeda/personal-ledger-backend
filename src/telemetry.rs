@@ -134,6 +134,22 @@ impl<'de> de::Deserialize<'de> for LogLevel {
     }
 }
 
+impl std::str::FromStr for LogLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "off" => Ok(LogLevel::OFF),
+            "error" => Ok(LogLevel::ERROR),
+            "warn" | "warning" => Ok(LogLevel::WARN),
+            "info" => Ok(LogLevel::INFO),
+            "debug" => Ok(LogLevel::DEBUG),
+            "trace" => Ok(LogLevel::TRACE),
+            other => Err(format!("Unknown log level: {}. Valid values are: off, error, warn, info, debug, trace", other)),
+        }
+    }
+}
+
 impl From<LogLevel> for tracing::level_filters::LevelFilter {
     fn from(level: LogLevel) -> Self {
         match level {

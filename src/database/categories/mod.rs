@@ -5,7 +5,7 @@
 //! database representation of a category alongside utilities for creating
 //! and inserting records during tests or data seeding.
 
-// #![allow(unused)] // For development only
+#![allow(unused)] // For development only
 
 mod builder;
 mod model;
@@ -18,5 +18,4 @@ mod find;
 pub use model::Category;
 
 /// Fluent builder for constructing `Category` instances in tests and fixtures.
-#[cfg(test)]
-pub use builder::CategoriesBuilder;
+pub use builder::CategoryBuilder;

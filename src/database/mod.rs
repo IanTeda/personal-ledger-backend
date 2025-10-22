@@ -79,3 +79,4 @@ mod categories;
 ///
 /// See [`categories`] module for implementation details.
 pub use categories::Category;
+pub use categories::CategoryBuilder;

@@ -33,9 +33,9 @@ impl database::Category {
     /// ```
     #[cfg(test)]
     pub fn mock() -> Self {
-        use crate::database::categories::CategoriesBuilder;
+        use crate::database::categories::CategoryBuilder;
 
-        CategoriesBuilder::new()
+        CategoryBuilder::new()
             .with_id(domain::RowID::mock())
             .with_code_opt(Some(Self::generate_mock_code()))
             .with_name(Self::generate_mock_name())
