@@ -20,7 +20,7 @@ use chrono::Utc;
 /// ensuring that required fields are present and valid, and that optional fields
 /// are handled correctly. Any validation or parsing errors are returned as a
 /// `ServiceError`.
-impl TryFrom<rpc::CategoryCreateRequest> for database::Category {
+impl TryFrom<rpc::CategoryCreateRequest> for database::Categories {
     type Error = ServiceError;
 
     fn try_from(value: rpc::CategoryCreateRequest) -> Result<Self, Self::Error> {
@@ -75,7 +75,7 @@ impl TryFrom<rpc::CategoryCreateRequest> for database::Category {
         let created_on = Utc::now();
         let updated_on = created_on;
 
-        Ok(database::Category {
+        Ok(database::Categories {
             id,
             code,
             name,
@@ -114,7 +114,7 @@ pub async fn create_category(
     let create_request = request.into_inner();
 
     // Convert the request to a database category
-    let category = match database::Category::try_from(create_request) {
+    let category = match database::Categories::try_from(create_request) {
         Ok(category) => category,
         Err(service_error) => {
             // Convert ServiceError to tonic::Status
@@ -175,7 +175,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_ok());
 
         let category = result.unwrap();
@@ -208,7 +208,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_ok());
 
         let category = result.unwrap();
@@ -229,7 +229,7 @@ mod tests {
             category: None,
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -253,7 +253,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -277,7 +277,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -301,7 +301,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -325,7 +325,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -349,7 +349,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -373,7 +373,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_ok());
 
         let category = result.unwrap();
@@ -402,7 +402,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -435,7 +435,7 @@ mod tests {
                 }),
             };
 
-            let result = database::Category::try_from(request);
+            let result = database::Categories::try_from(request);
             assert!(result.is_ok(), "Failed for category type {}", rpc_type);
 
             let category = result.unwrap();
@@ -463,7 +463,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ServiceError::Validation(_)));
     }
@@ -492,7 +492,7 @@ mod tests {
                 }),
             };
 
-            let result = database::Category::try_from(request);
+            let result = database::Categories::try_from(request);
             assert!(result.is_ok(), "Valid color {} should parse successfully", color);
         }
 
@@ -517,7 +517,7 @@ mod tests {
                 }),
             };
 
-            let result = database::Category::try_from(request);
+            let result = database::Categories::try_from(request);
             assert!(result.is_err(), "Invalid color {} should fail", color);
         }
     }
@@ -541,7 +541,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_ok());
 
         let category = result.unwrap();
@@ -570,7 +570,7 @@ mod tests {
             }),
         };
 
-        let result = database::Category::try_from(request);
+        let result = database::Categories::try_from(request);
         assert!(result.is_ok());
 
         let category = result.unwrap();

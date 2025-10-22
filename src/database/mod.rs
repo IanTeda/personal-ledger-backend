@@ -78,5 +78,5 @@ mod categories;
 /// builder pattern support.
 ///
 /// See [`categories`] module for implementation details.
-pub use categories::Category;
-pub use categories::CategoryBuilder;
+pub use categories::Categories;
+pub use categories::CategoriesBuilder;

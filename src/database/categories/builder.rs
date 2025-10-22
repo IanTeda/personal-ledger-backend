@@ -34,7 +34,7 @@ pub enum CategoryBuilderError {
 /// defaults are injected—such as marking the category as active or generating a
 /// deterministic code derived from the persisted identifier.
 #[derive(Debug, Default, Clone)]
-pub struct CategoryBuilder {
+pub struct CategoriesBuilder {
 	id: Option<domain::RowID>,
 	code: Option<String>,
 	name: Option<String>,
@@ -48,7 +48,7 @@ pub struct CategoryBuilder {
 	updated_on: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-impl CategoryBuilder {
+impl CategoriesBuilder {
 	/// Start building a new category with no preset values.
 	#[must_use]
 	pub fn new() -> Self {
@@ -188,7 +188,7 @@ impl CategoryBuilder {
 		self
 	}
 	/// Build the [`Category`], returning an error when required fields are missing.
-	pub fn build(self) -> Result<database::Category, CategoryBuilderError> {
+	pub fn build(self) -> Result<database::Categories, CategoryBuilderError> {
 		let name = self
 			.name
 			.ok_or(CategoryBuilderError::Name)?;
@@ -203,7 +203,7 @@ impl CategoryBuilder {
 		let url_slug = self.url_slug;
 		let now = chrono::Utc::now();
 
-		Ok(database::Category {
+		Ok(database::Categories {
 			id,
 			code,
 			name,
@@ -226,7 +226,7 @@ mod tests {
 	
 	#[test]
 	fn build_requires_name() {
-		let result = CategoryBuilder::new()
+		let result = CategoriesBuilder::new()
 			.with_category_type(CategoryTypes::Expense)
 			.build();
 		assert_eq!(result.unwrap_err(), CategoryBuilderError::Name);
@@ -234,7 +234,7 @@ mod tests {
 
 	#[test]
 	fn build_requires_category_type() {
-		let result = CategoryBuilder::new().with_name("Travel").build();
+		let result = CategoriesBuilder::new().with_name("Travel").build();
 		assert_eq!(
 			result.unwrap_err(),
 			CategoryBuilderError::CategoryType
@@ -243,7 +243,7 @@ mod tests {
 
 	#[test]
 	fn build_requires_code() {
-		let result = CategoryBuilder::new()
+		let result = CategoriesBuilder::new()
 			.with_name("Travel")
 			.with_category_type(CategoryTypes::Expense)
 			.build();
@@ -252,7 +252,7 @@ mod tests {
 
 	#[test]
 	fn builder_provides_defaults() {
-		let category = CategoryBuilder::new()
+		let category = CategoriesBuilder::new()
 			.with_name("Dining out")
 			.with_category_type(CategoryTypes::Expense)
 			.with_code("DIN.001")
@@ -272,7 +272,7 @@ mod tests {
 		let color = HexColor::parse("#123456").unwrap();
 		let slug = UrlSlug::parse("custom-slug").unwrap();
 
-		let category = CategoryBuilder::new()
+		let category = CategoriesBuilder::new()
 			.with_id(domain::RowID::new())
 			.with_name("Utilities")
 			.with_category_type(CategoryTypes::Expense)
@@ -297,7 +297,7 @@ mod tests {
 
 	#[test]
 	fn optional_setters_clear_values() {
-		let category = CategoryBuilder::new()
+		let category = CategoriesBuilder::new()
 			.with_name("Optional")
 			.with_category_type(CategoryTypes::Income)
 			.with_code("OPT.001")

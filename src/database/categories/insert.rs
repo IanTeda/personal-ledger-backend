@@ -2,7 +2,7 @@ use crate::database::{self, DatabaseResult};
 use crate::domain;
 
 
-impl database::Category {
+impl database::Categories {
     /// Inserts a new category into the database.
     ///
     /// This function performs a single category insertion, reading back the inserted
@@ -136,7 +136,7 @@ impl database::Category {
         // 2) SELECT: Read back the inserted row with explicit type annotations
         // for UUID and chrono types to avoid NULL/mapping issues in SQLite.
         let category = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -251,7 +251,7 @@ impl database::Category {
 
             // Read back the inserted category
             let inserted = sqlx::query_as!(
-                database::Category,
+                database::Categories,
                 r#"
                     SELECT
                         id              AS "id!: domain::RowID",
@@ -376,7 +376,7 @@ impl database::Category {
 
         // Read back the inserted/updated category
         let result = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -463,7 +463,7 @@ pub mod tests {
     }
 
     #[cfg(test)]
-    fn generate_fake_category() -> database::Category {
+    fn generate_fake_category() -> database::Categories {
         use fake::Fake;
         use fake::faker::boolean::en::Boolean;
 
@@ -472,7 +472,7 @@ pub mod tests {
             false => domain::CategoryTypes::Income,
         };
 
-        database::Category {
+        database::Categories {
             id: domain::RowID::new(),
             code: generate_fake_code(),
             name: generate_fake_name(),
@@ -489,7 +489,7 @@ pub mod tests {
 
     #[sqlx::test]
     async fn insert_single_category_success(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let category = database::Category::mock();
+        let category = database::Categories::mock();
 
         let inserted = category.insert(&pool).await?;
 
@@ -511,7 +511,7 @@ pub mod tests {
         let fake_code = generate_fake_code();
         let fake_name = generate_fake_name();
 
-        let category = database::Category {
+        let category = database::Categories {
             id: domain::RowID::new(),
             code: fake_code.clone(),
             name: fake_name.clone(),
@@ -548,7 +548,7 @@ pub mod tests {
         let color = domain::HexColor::parse("#FF5733")?;
         let slug = domain::UrlSlug::parse("test-category")?;
 
-        let category = database::Category {
+        let category = database::Categories {
             id: domain::RowID::new(),
             code: fake_code.clone(),
             name: fake_name.clone(),
@@ -579,7 +579,7 @@ pub mod tests {
         let fake_name1 = generate_fake_name();
         let fake_name2 = generate_fake_name();
 
-        let category1 = database::Category {
+        let category1 = database::Categories {
             id: domain::RowID::new(),
             code: duplicate_code.clone(),
             name: fake_name1,
@@ -593,7 +593,7 @@ pub mod tests {
             updated_on: chrono::Utc::now(),
         };
 
-        let category2 = database::Category {
+        let category2 = database::Categories {
             id: domain::RowID::new(),
             code: duplicate_code, // Same code
             name: fake_name2,
@@ -623,7 +623,7 @@ pub mod tests {
         let fake_code1 = generate_fake_code();
         let fake_code2 = generate_fake_code();
 
-        let category1 = database::Category {
+        let category1 = database::Categories {
             id: domain::RowID::new(),
             code: fake_code1,
             name: duplicate_name.clone(),
@@ -637,7 +637,7 @@ pub mod tests {
             updated_on: chrono::Utc::now(),
         };
 
-        let category2 = database::Category {
+        let category2 = database::Categories {
             id: domain::RowID::new(),
             code: fake_code2,
             name: duplicate_name, // Same name
@@ -675,7 +675,7 @@ pub mod tests {
         let fake_code = generate_fake_code();
         let fake_name = generate_fake_name();
 
-        let category = database::Category {
+        let category = database::Categories {
             id: domain::RowID::new(),
             code: fake_code,
             name: fake_name,
@@ -698,9 +698,9 @@ pub mod tests {
 
     #[sqlx::test]
     async fn insert_many_empty_list(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let categories: Vec<database::Category> = vec![];
+        let categories: Vec<database::Categories> = vec![];
 
-        let result = database::Category::insert_many(&categories, &pool).await?;
+        let result = database::Categories::insert_many(&categories, &pool).await?;
 
         assert!(result.is_empty());
 
@@ -715,7 +715,7 @@ pub mod tests {
             generate_fake_category(),
         ];
 
-        let inserted = database::Category::insert_many(&categories, &pool).await?;
+        let inserted = database::Categories::insert_many(&categories, &pool).await?;
 
         assert_eq!(inserted.len(), 3);
         for (original, inserted_cat) in categories.iter().zip(inserted.iter()) {
@@ -739,7 +739,7 @@ pub mod tests {
 
         let categories = vec![category1, category2];
 
-        let result = database::Category::insert_many(&categories, &pool).await;
+        let result = database::Categories::insert_many(&categories, &pool).await;
         assert!(result.is_err());
 
         // Verify neither category was inserted due to transaction rollback
@@ -757,7 +757,7 @@ pub mod tests {
     async fn insert_or_update_creates_new(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         let category = generate_fake_category();
 
-        let result = database::Category::insert_or_update(&category, &pool).await?;
+        let result = database::Categories::insert_or_update(&category, &pool).await?;
 
         assert_eq!(result.id, category.id);
         assert_eq!(result.code, category.code);
@@ -776,7 +776,7 @@ pub mod tests {
         category.name = original_name.clone();
 
         // Insert initially
-        let inserted = database::Category::insert_or_update(&category, &pool).await?;
+        let inserted = database::Categories::insert_or_update(&category, &pool).await?;
         assert_eq!(inserted.name, original_name);
 
         // Update the category
@@ -784,7 +784,7 @@ pub mod tests {
         category.updated_on = chrono::Utc::now();
 
         // Upsert should update
-        let updated = database::Category::insert_or_update(&category, &pool).await?;
+        let updated = database::Categories::insert_or_update(&category, &pool).await?;
         assert_eq!(updated.id, category.id);
         assert_eq!(updated.code, fake_code); // Unchanged
         assert_eq!(updated.name, updated_name); // Updated
@@ -798,16 +798,16 @@ pub mod tests {
         let original_created_on = category.created_on;
 
         // Insert
-        let inserted = database::Category::insert_or_update(&category, &pool).await?;
+        let inserted = database::Categories::insert_or_update(&category, &pool).await?;
         assert_eq!(inserted.created_on, original_created_on);
 
         // Update
-        let updated_category = database::Category {
+        let updated_category = database::Categories {
             updated_on: chrono::Utc::now(),
             ..category
         };
 
-        let updated = database::Category::insert_or_update(&updated_category, &pool).await?;
+        let updated = database::Categories::insert_or_update(&updated_category, &pool).await?;
         assert_eq!(updated.created_on, original_created_on); // Should be preserved
         assert_ne!(updated.updated_on, original_created_on); // Should be updated
 
@@ -821,7 +821,7 @@ pub mod tests {
         let fake_name2 = generate_fake_name();
 
         // Insert first category
-        let category1 = database::Category {
+        let category1 = database::Categories {
             id: domain::RowID::new(),
             code: duplicate_code.clone(),
             name: fake_name1,
@@ -835,10 +835,10 @@ pub mod tests {
             updated_on: chrono::Utc::now(),
         };
 
-        database::Category::insert_or_update(&category1, &pool).await?;
+        database::Categories::insert_or_update(&category1, &pool).await?;
 
         // Try to upsert a different category with same code (but different ID)
-        let category2 = database::Category {
+        let category2 = database::Categories {
             id: domain::RowID::new(), // Different ID
             code: duplicate_code, // Same code - should fail
             name: fake_name2,
@@ -852,7 +852,7 @@ pub mod tests {
             updated_on: chrono::Utc::now(),
         };
 
-        let result = database::Category::insert_or_update(&category2, &pool).await;
+        let result = database::Categories::insert_or_update(&category2, &pool).await;
         assert!(result.is_err());
 
         Ok(())
@@ -861,7 +861,7 @@ pub mod tests {
     // Test inserting into database
     #[sqlx::test]
     async fn create_database_record(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let new_category = database::Category::mock();
+        let new_category = database::Categories::mock();
 
         let database_record = new_category.insert(&pool).await?;
 

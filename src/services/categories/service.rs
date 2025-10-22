@@ -30,8 +30,8 @@ impl CategoriesService {
 }
 
 /// Convert a database::Category into a Category Response message
-impl From<database::Category> for rpc::Category {
-    fn from(category: database::Category) -> Self {
+impl From<database::Categories> for rpc::Category {
+    fn from(category: database::Categories) -> Self {
         use prost_types::Timestamp;
 
         Self {
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_from_database_category_to_rpc_category() {
         // Create a mock database category
-        let db_category = database::Category::mock();
+        let db_category = database::Categories::mock();
 
         // Convert to RPC category
         let rpc_category: rpc::Category = db_category.clone().into();

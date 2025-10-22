@@ -5,7 +5,7 @@ use crate::domain;
 ///
 /// This module provides functions for retrieving existing category records from the database,
 /// including single record lookups, bulk retrieval, and filtered queries.
-impl database::Category {
+impl database::Categories {
     /// Finds a category by its ID.
     ///
     /// This function retrieves a single category record from the database by its unique identifier.
@@ -49,7 +49,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Option<Self>> {
         let category = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -115,7 +115,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Option<Self>> {
         let category = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -183,7 +183,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Option<Self>> {
         let category = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -246,7 +246,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Vec<Self>> {
         let categories = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -311,7 +311,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Vec<Self>> {
         let categories = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -380,7 +380,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Vec<Self>> {
         let categories = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -447,7 +447,7 @@ impl database::Category {
         pool: &sqlx::Pool<sqlx::Sqlite>,
     ) -> DatabaseResult<Vec<Self>> {
         let categories = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -482,17 +482,17 @@ mod tests {
     use sqlx::SqlitePool;
 
     /// Helper function to create a test category
-    async fn create_test_category(pool: &SqlitePool) -> database::Category {
-        let category = database::Category::mock();
-        database::Category::insert(&category, pool).await.unwrap();
+    async fn create_test_category(pool: &SqlitePool) -> database::Categories {
+        let category = database::Categories::mock();
+        database::Categories::insert(&category, pool).await.unwrap();
         category
     }
 
     /// Helper function to create multiple test categories
-    async fn create_test_categories(count: usize, pool: &SqlitePool) -> Vec<database::Category> {
+    async fn create_test_categories(count: usize, pool: &SqlitePool) -> Vec<database::Categories> {
         let mut categories = Vec::with_capacity(count);
         for i in 0..count {
-            let mut category = database::Category::mock();
+            let mut category = database::Categories::mock();
             // Override specific fields for test scenarios
             category.code = format!("TEST.{:03}", i);
             category.name = format!("Test Category {}", i);
@@ -500,7 +500,7 @@ mod tests {
             category.url_slug = Some(domain::UrlSlug::from(format!("test-category-{}", i)));
             category.category_type = if i % 2 == 0 { domain::CategoryTypes::Expense } else { domain::CategoryTypes::Income };
             category.is_active = i % 3 != 0; // Every 3rd category is inactive
-            database::Category::insert(&category, pool).await.unwrap();
+            database::Categories::insert(&category, pool).await.unwrap();
             categories.push(category);
         }
         categories
@@ -512,7 +512,7 @@ mod tests {
         let category = create_test_category(&pool).await;
 
         // Find it by ID
-        let found = database::Category::find_by_id(category.id, &pool).await.unwrap();
+        let found = database::Categories::find_by_id(category.id, &pool).await.unwrap();
 
         // Verify it's the same category
         assert!(found.is_some());
@@ -532,7 +532,7 @@ mod tests {
     async fn test_find_by_id_nonexistent_category(pool: SqlitePool) {
         // Try to find a category that doesn't exist
         let fake_id = domain::RowID::new();
-        let result = database::Category::find_by_id(fake_id, &pool).await.unwrap();
+        let result = database::Categories::find_by_id(fake_id, &pool).await.unwrap();
 
         // Should return None
         assert!(result.is_none());
@@ -544,7 +544,7 @@ mod tests {
         let category = create_test_category(&pool).await;
 
         // Find it by code
-        let found = database::Category::find_by_code(&category.code, &pool).await.unwrap();
+        let found = database::Categories::find_by_code(&category.code, &pool).await.unwrap();
 
         // Verify it's the same category
         assert!(found.is_some());
@@ -556,7 +556,7 @@ mod tests {
     #[sqlx::test]
     async fn test_find_by_code_nonexistent_category(pool: SqlitePool) {
         // Try to find a category that doesn't exist
-        let result = database::Category::find_by_code("NONEXISTENT.CODE", &pool).await.unwrap();
+        let result = database::Categories::find_by_code("NONEXISTENT.CODE", &pool).await.unwrap();
 
         // Should return None
         assert!(result.is_none());
@@ -569,15 +569,15 @@ mod tests {
         category.code = category.code.to_uppercase();
 
         // Update it in the database
-        database::Category::update(&category, &pool).await.unwrap();
+        database::Categories::update(&category, &pool).await.unwrap();
 
         // Try to find with lowercase version - should fail
         let lowercase_code = category.code.to_lowercase();
-        let result = database::Category::find_by_code(&lowercase_code, &pool).await.unwrap();
+        let result = database::Categories::find_by_code(&lowercase_code, &pool).await.unwrap();
         assert!(result.is_none());
 
         // Find with correct case should work
-        let result = database::Category::find_by_code(&category.code, &pool).await.unwrap();
+        let result = database::Categories::find_by_code(&category.code, &pool).await.unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().id, category.id);
     }
@@ -589,7 +589,7 @@ mod tests {
 
         // Find it by URL slug (assuming it has one)
         if let Some(ref slug) = category.url_slug {
-            let found = database::Category::find_by_url_slug(slug, &pool).await.unwrap();
+            let found = database::Categories::find_by_url_slug(slug, &pool).await.unwrap();
 
             // Verify it's the same category
             assert!(found.is_some());
@@ -598,13 +598,13 @@ mod tests {
             assert_eq!(found.url_slug, category.url_slug);
         } else {
             // If no slug, create one with a slug
-            let category_with_slug = database::Category {
+            let category_with_slug = database::Categories {
                 url_slug: Some(domain::UrlSlug::from("test-slug")),
                 ..category
             };
-            database::Category::update(&category_with_slug, &pool).await.unwrap();
+            database::Categories::update(&category_with_slug, &pool).await.unwrap();
 
-            let found = database::Category::find_by_url_slug(&domain::UrlSlug::from("test-slug"), &pool).await.unwrap();
+            let found = database::Categories::find_by_url_slug(&domain::UrlSlug::from("test-slug"), &pool).await.unwrap();
             assert!(found.is_some());
             assert_eq!(found.unwrap().id, category.id);
         }
@@ -614,7 +614,7 @@ mod tests {
     async fn test_find_by_url_slug_nonexistent_category(pool: SqlitePool) {
         // Try to find a category with a slug that doesn't exist
         let fake_slug = domain::UrlSlug::from("nonexistent-slug");
-        let result = database::Category::find_by_url_slug(&fake_slug, &pool).await.unwrap();
+        let result = database::Categories::find_by_url_slug(&fake_slug, &pool).await.unwrap();
 
         // Should return None
         assert!(result.is_none());
@@ -626,7 +626,7 @@ mod tests {
         let test_categories = create_test_categories(5, &pool).await;
 
         // Find all categories
-        let all_categories = database::Category::find_all(&pool).await.unwrap();
+        let all_categories = database::Categories::find_all(&pool).await.unwrap();
 
         // Should have at least our test categories
         assert!(all_categories.len() >= test_categories.len());
@@ -641,7 +641,7 @@ mod tests {
     #[sqlx::test]
     async fn test_find_all_empty_database(pool: SqlitePool) {
         // Find all categories in empty database
-        let all_categories = database::Category::find_all(&pool).await.unwrap();
+        let all_categories = database::Categories::find_all(&pool).await.unwrap();
 
         // Should return empty vector
         assert!(all_categories.is_empty());
@@ -653,7 +653,7 @@ mod tests {
         let test_categories = create_test_categories(9, &pool).await; // 3 inactive, 6 active
 
         // Find all active categories
-        let active_categories = database::Category::find_all_active(&pool).await.unwrap();
+        let active_categories = database::Categories::find_all_active(&pool).await.unwrap();
 
         // Should have exactly the active ones
         let expected_active_count = test_categories.iter().filter(|c| c.is_active).count();
@@ -678,7 +678,7 @@ mod tests {
         // Create only inactive categories
         let mut inactive_categories = Vec::new();
         for i in 0..3 {
-            let category = database::Category {
+            let category = database::Categories {
                 id: domain::RowID::new(),
                 code: format!("INACTIVE.{:03}", i),
                 name: format!("Inactive Category {}", i),
@@ -691,12 +691,12 @@ mod tests {
                 created_on: chrono::Utc::now(),
                 updated_on: chrono::Utc::now(),
             };
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
             inactive_categories.push(category);
         }
 
         // Find all active categories
-        let active_categories = database::Category::find_all_active(&pool).await.unwrap();
+        let active_categories = database::Categories::find_all_active(&pool).await.unwrap();
 
         // Should return empty vector
         assert!(active_categories.is_empty());
@@ -708,7 +708,7 @@ mod tests {
         let test_categories = create_test_categories(10, &pool).await;
 
         // Find expense categories
-        let expense_categories = database::Category::find_by_type(domain::CategoryTypes::Expense, &pool).await.unwrap();
+        let expense_categories = database::Categories::find_by_type(domain::CategoryTypes::Expense, &pool).await.unwrap();
 
         // Verify all returned categories are expenses
         for category in &expense_categories {
@@ -728,7 +728,7 @@ mod tests {
         let test_categories = create_test_categories(10, &pool).await;
 
         // Find income categories
-        let income_categories = database::Category::find_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
+        let income_categories = database::Categories::find_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
 
         // Verify all returned categories are income
         for category in &income_categories {
@@ -746,7 +746,7 @@ mod tests {
     async fn test_find_by_type_no_categories_of_type(pool: SqlitePool) {
         // Create only expense categories
         for i in 0..3 {
-            let category = database::Category {
+            let category = database::Categories {
                 id: domain::RowID::new(),
                 code: format!("EXPENSE.{:03}", i),
                 name: format!("Expense Category {}", i),
@@ -759,11 +759,11 @@ mod tests {
                 created_on: chrono::Utc::now(),
                 updated_on: chrono::Utc::now(),
             };
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
         }
 
         // Try to find income categories
-        let income_categories = database::Category::find_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
+        let income_categories = database::Categories::find_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
 
         // Should return empty vector
         assert!(income_categories.is_empty());
@@ -775,7 +775,7 @@ mod tests {
         let test_categories = create_test_categories(12, &pool).await; // 4 inactive, 8 active
 
         // Find active expense categories
-        let active_expense_categories = database::Category::find_active_by_type(domain::CategoryTypes::Expense, &pool).await.unwrap();
+        let active_expense_categories = database::Categories::find_active_by_type(domain::CategoryTypes::Expense, &pool).await.unwrap();
 
         // Verify all returned categories are active expenses
         for category in &active_expense_categories {
@@ -790,7 +790,7 @@ mod tests {
         assert_eq!(active_expense_categories.len(), expected_active_expense_count);
 
         // Find active income categories
-        let active_income_categories = database::Category::find_active_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
+        let active_income_categories = database::Categories::find_active_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
 
         // Verify all returned categories are active income
         for category in &active_income_categories {
@@ -809,7 +809,7 @@ mod tests {
     async fn test_find_active_by_type_no_active_categories_of_type(pool: SqlitePool) {
         // Create only inactive income categories
         for i in 0..3 {
-            let category = database::Category {
+            let category = database::Categories {
                 id: domain::RowID::new(),
                 code: format!("INCOME.{:03}", i),
                 name: format!("Income Category {}", i),
@@ -822,11 +822,11 @@ mod tests {
                 created_on: chrono::Utc::now(),
                 updated_on: chrono::Utc::now(),
             };
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
         }
 
         // Try to find active income categories
-        let active_income_categories = database::Category::find_active_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
+        let active_income_categories = database::Categories::find_active_by_type(domain::CategoryTypes::Income, &pool).await.unwrap();
 
         // Should return empty vector
         assert!(active_income_categories.is_empty());
