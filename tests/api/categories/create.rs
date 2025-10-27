@@ -590,7 +590,7 @@ async fn batch_create_succeeds_with_different_category_types(database_pool: sqlx
     assert_eq!(response_message.categories.len(), 4);
 
     // Verify each created category has the correct type
-    let expected_types = vec![
+    let expected_types = [
         rpc::CategoryTypes::Asset,
         rpc::CategoryTypes::Liability,
         rpc::CategoryTypes::Equity,

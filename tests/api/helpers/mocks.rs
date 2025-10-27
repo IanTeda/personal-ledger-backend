@@ -108,6 +108,7 @@ pub fn mock_row_id() -> personal_ledger_backend::domain::RowID {
 ///   for dates far outside the valid Unix timestamp range.
 /// - Panics if the timestamp conversion to UUID fails, though this is unlikely
 ///   for valid `DateTime<Utc>` inputs.
+#[allow(dead_code)]
 pub fn mock_row_id_from_datetime(
     date_time: chrono::DateTime<chrono::Utc>,
 ) -> personal_ledger_backend::domain::RowID {

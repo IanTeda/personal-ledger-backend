@@ -27,6 +27,7 @@ pub struct SpawnTonicServer {
     /// The actual address the server is bound to (with OS-assigned port)
     pub address: net::SocketAddr,
     /// Shutdown sender to gracefully stop the server
+    #[allow(dead_code)]
     shutdown_tx: Arc<tokio::sync::Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -119,6 +120,7 @@ impl SpawnTonicServer {
     /// Get the address the server is bound to.
     ///
     /// This returns the actual address with the OS-assigned port.
+    #[allow(dead_code)]
     pub fn address(&self) -> net::SocketAddr {
         self.address
     }
@@ -145,6 +147,7 @@ impl SpawnTonicServer {
     /// # Note
     /// This is a best-effort shutdown. If the server doesn't respond to the
     /// shutdown signal within a reasonable time, the test process may still exit.
+    #[allow(dead_code)]
     pub async fn shutdown(self) {
         if let Some(tx) = self.shutdown_tx.lock().await.take() {
             let _ = tx.send(());
