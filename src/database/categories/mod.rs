@@ -15,8 +15,7 @@ mod delete;
 mod find;
 
 /// Database row model representing a persisted category.
-pub use model::Category;
+pub use model::Categories;
 
 /// Fluent builder for constructing `Category` instances in tests and fixtures.
-#[cfg(test)]
 pub use builder::CategoriesBuilder;

@@ -1,27 +1,6 @@
 //-- ./src/main.rs
 
-use tonic::{transport::Server, Request, Response, Status};
-use tonic_reflection::server as TonicRefelectionServer;
-use personal_ledger_backend::{rpc, telemetry, LedgerResult};
-
-#[derive(Default)]
-pub struct MyUtilitiesService {}
-
-#[tonic::async_trait]
-impl rpc::UtilitiesService for MyUtilitiesService {
-    async fn ping(
-        &self,
-        request: Request<rpc::PingRequest>,
-    ) -> Result<Response<rpc::PingResponse>, Status> {
-        println!("Got a request from {:?}", request.remote_addr());
-
-        let reply: rpc::PingResponse = rpc::PingResponse {
-            message: "Pong...".to_string(),
-        };
-
-        Ok(Response::new(reply)) // Send back ping response
-    }
-}
+use personal_ledger_backend::{database, server, telemetry, LedgerResult};
 
 /// Main server implementation for personal-ledger-backend
 /// Implements a gRPC server using Tonic and includes server reflection
@@ -29,40 +8,22 @@ impl rpc::UtilitiesService for MyUtilitiesService {
 #[tokio::main]
 async fn main() -> LedgerResult<()> {
 
-    let config = personal_ledger_backend::LedgerConfig::parse()?;
-    let log_level = config.server.log_level();
+    // Parse ledger configuration file
+    let ledger_config = personal_ledger_backend::LedgerConfig::parse()?;
 
-    telemetry::init(log_level)?;
+    let log_level = ledger_config.server.log_level();
+
+    #[allow(clippy::let_unit_value)]
+    let _telemetry_guard = telemetry::init(log_level)?;
     tracing::info!("Starting tracing at level '{:?}'", log_level);
 
     // Initialize the database connection pool and run migrations
-    let _database_url = config.server.database_url()?;
+    let database_url = ledger_config.server.database_url()?;
+    let database_pool = database::DatabasePool::new(&database_url);
 
-    // Build reflections service
-    let reflections_service = TonicRefelectionServer::Builder::configure()
-        .register_encoded_file_descriptor_set(rpc::FILE_DESCRIPTOR_SET)
-        .build_v1()
-        .unwrap();
+    let tonic_server = server::TonicServer::new(database_pool.into_pool()?, ledger_config).await?;
 
-    let server_address = config.server.address()?;
-    tracing::info!("Starting Tonic server at '{}'", server_address);
-
-    let utility_server = MyUtilitiesService::default();
-
-    let (health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<rpc::UtilitiesServiceServer<MyUtilitiesService>>()
-        .await;
-
-    tracing::info!("Tonic server started at '{}'", server_address);
-
-    // Build Tonic gRPC server
-    Server::builder()
-        .add_service(health_service)
-        .add_service(reflections_service)
-        .add_service(rpc::UtilitiesServiceServer::new(utility_server))
-        .serve(server_address)
-        .await?;
+    tonic_server.run().await?;
 
     Ok(())
 }

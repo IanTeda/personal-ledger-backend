@@ -6,16 +6,14 @@
 //! fixtures, and data seeding utilities where creating category rows should be
 //! ergonomic and explicit.
 
-// #![allow(unused)] // For development only
+#![allow(unused)] // For development only
 
-#[cfg(test)]
 use crate::{database, domain};
 
 
-/// Errors emitted by [`CategoriesBuilder::build`] when required data is missing.
+/// Errors emitted by [`CategoryBuilder::build`] when required data is missing.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
-#[cfg(test)]
-pub enum CategoriesBuilderError {
+pub enum CategoryBuilderError {
 	/// The category name was not provided.
 	#[error("category name is required")]
 	Name,
@@ -36,7 +34,6 @@ pub enum CategoriesBuilderError {
 /// defaults are injected—such as marking the category as active or generating a
 /// deterministic code derived from the persisted identifier.
 #[derive(Debug, Default, Clone)]
-#[cfg(test)]
 pub struct CategoriesBuilder {
 	id: Option<domain::RowID>,
 	code: Option<String>,
@@ -51,7 +48,6 @@ pub struct CategoriesBuilder {
 	updated_on: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-#[cfg(test)]
 impl CategoriesBuilder {
 	/// Start building a new category with no preset values.
 	#[must_use]
@@ -192,22 +188,22 @@ impl CategoriesBuilder {
 		self
 	}
 	/// Build the [`Category`], returning an error when required fields are missing.
-	pub fn build(self) -> Result<database::Category, CategoriesBuilderError> {
+	pub fn build(self) -> Result<database::Categories, CategoryBuilderError> {
 		let name = self
 			.name
-			.ok_or(CategoriesBuilderError::Name)?;
+			.ok_or(CategoryBuilderError::Name)?;
 		let category_type = self
 			.category_type
-			.ok_or(CategoriesBuilderError::CategoryType)?;
+			.ok_or(CategoryBuilderError::CategoryType)?;
 		let code = self
 			.code
-			.ok_or(CategoriesBuilderError::Code)?;
+			.ok_or(CategoryBuilderError::Code)?;
 
 	  let id = self.id.unwrap_or_default();
 		let url_slug = self.url_slug;
 		let now = chrono::Utc::now();
 
-		Ok(database::Category {
+		Ok(database::Categories {
 			id,
 			code,
 			name,
@@ -233,7 +229,7 @@ mod tests {
 		let result = CategoriesBuilder::new()
 			.with_category_type(CategoryTypes::Expense)
 			.build();
-		assert_eq!(result.unwrap_err(), CategoriesBuilderError::Name);
+		assert_eq!(result.unwrap_err(), CategoryBuilderError::Name);
 	}
 
 	#[test]
@@ -241,7 +237,7 @@ mod tests {
 		let result = CategoriesBuilder::new().with_name("Travel").build();
 		assert_eq!(
 			result.unwrap_err(),
-			CategoriesBuilderError::CategoryType
+			CategoryBuilderError::CategoryType
 		);
 	}
 
@@ -251,7 +247,7 @@ mod tests {
 			.with_name("Travel")
 			.with_category_type(CategoryTypes::Expense)
 			.build();
-		assert_eq!(result.unwrap_err(), CategoriesBuilderError::Code);
+		assert_eq!(result.unwrap_err(), CategoryBuilderError::Code);
 	}
 
 	#[test]

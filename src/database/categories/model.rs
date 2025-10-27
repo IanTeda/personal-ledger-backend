@@ -3,7 +3,7 @@ use crate::{database, domain};
 
 // TODO: Move code into a domain type
 #[derive(Debug, sqlx::FromRow, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
-pub struct Category {
+pub struct Categories {
     pub id: domain::RowID,
     pub code: String,
     pub name: String,
@@ -17,7 +17,7 @@ pub struct Category {
     pub updated_on: chrono::DateTime<chrono::Utc>,
 }
 
-impl database::Category {
+impl database::Categories {
     /// Generates a mock `Category` instance with randomized test data.
     ///
     /// This function creates realistic test data for categories, using the `fake` crate
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn mock_generates_valid_category() {
-        let cat = Category::mock();
+        let cat = Categories::mock();
         assert!(!cat.name.is_empty());
         assert!(!cat.code.is_empty());
         assert!(cat.code.contains('.'));
@@ -143,7 +143,7 @@ mod tests {
         let mut has_inactive = false;
 
         for _ in 0..50 {
-            let cat = Category::mock();
+            let cat = Categories::mock();
             if cat.description.is_some() {
                 has_some_description = true;
             } else {
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn generate_mock_code_produces_valid_format() {
-        let code = Category::generate_mock_code();
+        let code = Categories::generate_mock_code();
         assert_eq!(code.len(), 11); // XXX.XXX.XXX
         assert!(code.chars().all(|c| c.is_ascii_alphanumeric() || c == '.'));
         let parts: Vec<&str> = code.split('.').collect();
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn generate_mock_name_produces_non_empty_string() {
-        let name = Category::generate_mock_name();
+        let name = Categories::generate_mock_name();
         assert!(!name.is_empty());
         assert!(name.chars().all(|c| c.is_alphabetic() || c.is_whitespace()));
     }
@@ -188,7 +188,7 @@ mod tests {
         let mut has_some = false;
         let mut has_none = false;
         for _ in 0..20 {
-            let desc = Category::generate_mock_description();
+            let desc = Categories::generate_mock_description();
             if desc.is_some() {
                 has_some = true;
                 assert!(!desc.as_ref().unwrap().is_empty());
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn generate_mock_url_slug_uses_name() {
-        let slug = Category::generate_mock_url_slug();
+        let slug = Categories::generate_mock_url_slug();
         assert!(slug.is_some());
         // Since UrlSlug::from handles parsing, just check it's not empty
         assert!(!slug.as_ref().unwrap().as_str().is_empty());
@@ -212,7 +212,7 @@ mod tests {
         let mut has_some = false;
         let mut has_none = false;
         for _ in 0..20 {
-            let icon = Category::generate_mock_icon();
+            let icon = Categories::generate_mock_icon();
             if icon.is_some() {
                 has_some = true;
                 assert!(!icon.as_ref().unwrap().is_empty());
@@ -229,7 +229,7 @@ mod tests {
         let mut has_true = false;
         let mut has_false = false;
         for _ in 0..20 {
-            let active = Category::generate_mock_is_active();
+            let active = Categories::generate_mock_is_active();
             if active {
                 has_true = true;
             } else {
@@ -241,17 +241,17 @@ mod tests {
 
     #[test]
     fn category_struct_derives_work() {
-        let cat1 = Category::mock();
+        let cat1 = Categories::mock();
         let cat2 = cat1.clone();
         assert_eq!(cat1, cat2);
 
         // Test Debug (implicitly by using in assert)
         let debug_str = format!("{:?}", cat1);
-        assert!(debug_str.contains("Category"));
+        assert!(debug_str.contains("Categories"));
 
         // Test Serialize/Deserialize
         let json = serde_json::to_string(&cat1).unwrap();
-        let deserialized: Category = serde_json::from_str(&json).unwrap();
+        let deserialized: Categories = serde_json::from_str(&json).unwrap();
         assert_eq!(cat1, deserialized);
     }
 }

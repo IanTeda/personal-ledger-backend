@@ -5,7 +5,7 @@ use crate::domain;
 ///
 /// This module provides functions for deleting existing category records from the database,
 /// including single record deletion, bulk deletion, and specialized delete operations.
-impl database::Category {
+impl database::Categories {
     /// Deletes this category from the database.
     ///
     /// This function permanently removes the current category record from the database.
@@ -363,18 +363,18 @@ mod tests {
     use sqlx::SqlitePool;
 
     /// Helper function to create a test category
-    async fn create_test_category(pool: &SqlitePool) -> database::Category {
-        let category = database::Category::mock();
-        database::Category::insert(&category, pool).await.unwrap();
+    async fn create_test_category(pool: &SqlitePool) -> database::Categories {
+        let category = database::Categories::mock();
+        database::Categories::insert(&category, pool).await.unwrap();
         category
     }
 
     /// Helper function to create multiple test categories
-    async fn create_test_categories(count: usize, pool: &SqlitePool) -> Vec<database::Category> {
+    async fn create_test_categories(count: usize, pool: &SqlitePool) -> Vec<database::Categories> {
         let mut categories = Vec::with_capacity(count);
         for _ in 0..count {
-            let category = database::Category::mock();
-            database::Category::insert(&category, pool).await.unwrap();
+            let category = database::Categories::mock();
+            database::Categories::insert(&category, pool).await.unwrap();
             categories.push(category);
         }
         categories
@@ -386,19 +386,19 @@ mod tests {
         let category = create_test_category(&pool).await;
 
         // Verify it exists by trying to insert a duplicate (should fail)
-        let duplicate = database::Category {
+        let duplicate = database::Categories {
             id: category.id,
             ..category.clone()
         };
-        let insert_result = database::Category::insert_or_update(&duplicate, &pool).await;
+        let insert_result = database::Categories::insert_or_update(&duplicate, &pool).await;
         assert!(insert_result.is_ok()); // Should succeed (update existing)
 
         // Delete the category
-        let result = database::Category::delete_by_id(category.id, &pool).await;
+        let result = database::Categories::delete_by_id(category.id, &pool).await;
         assert!(result.is_ok());
 
         // Verify it's gone by trying to insert with same ID (should succeed as new insert)
-        let reinsert_result = database::Category::insert(&category, &pool).await;
+        let reinsert_result = database::Categories::insert(&category, &pool).await;
         assert!(reinsert_result.is_ok());
     }
 
@@ -406,7 +406,7 @@ mod tests {
     async fn test_delete_nonexistent_category(pool: SqlitePool) {
         // Try to delete a category that doesn't exist
         let fake_id = RowID::new();
-        let result = database::Category::delete_by_id(fake_id, &pool).await;
+        let result = database::Categories::delete_by_id(fake_id, &pool).await;
 
         // Should return NotFound error
         assert!(matches!(result, Err(database::DatabaseError::NotFound(_))));
@@ -420,12 +420,12 @@ mod tests {
         let ids: Vec<RowID> = categories.iter().map(|c| c.id).collect();
 
         // Delete them all
-        let result = database::Category::delete_many_by_id(&ids, &pool).await;
+        let result = database::Categories::delete_many_by_id(&ids, &pool).await;
         assert!(result.is_ok());
 
         // Verify they're all gone by trying to re-insert them
         for category in &categories {
-            let reinsert_result = database::Category::insert(category, &pool).await;
+            let reinsert_result = database::Categories::insert(category, &pool).await;
             assert!(reinsert_result.is_ok()); // Should succeed as they're gone
         }
     }
@@ -441,24 +441,24 @@ mod tests {
         ids.push(fake_id);
 
         // Try to delete - should fail due to nonexistent category
-        let result = database::Category::delete_many_by_id(&ids, &pool).await;
+        let result = database::Categories::delete_many_by_id(&ids, &pool).await;
         assert!(matches!(result, Err(database::DatabaseError::NotFound(_))));
         assert!(result.unwrap_err().to_string().contains(&fake_id.to_string()));
 
         // The real category should still exist (transaction rolled back)
         // Verify by trying to insert duplicate (should fail as update)
-        let duplicate = database::Category {
+        let duplicate = database::Categories {
             id: category.id,
             ..category.clone()
         };
-        let insert_result = database::Category::insert_or_update(&duplicate, &pool).await;
+        let insert_result = database::Categories::insert_or_update(&duplicate, &pool).await;
         assert!(insert_result.is_ok()); // Should succeed (update existing)
     }
 
     #[sqlx::test]
     async fn test_delete_many_empty_list(pool: SqlitePool) {
         // Delete with empty list should succeed
-        let result = database::Category::delete_many_by_id(&[], &pool).await;
+        let result = database::Categories::delete_many_by_id(&[], &pool).await;
         assert!(result.is_ok());
     }
 
@@ -467,46 +467,46 @@ mod tests {
         // Create some active categories
         let mut active_categories = Vec::new();
         for i in 0..2 {
-            let mut category = database::Category::mock();
+            let mut category = database::Categories::mock();
             category.code = format!("ACTIVE.{:03}", i);
             category.name = format!("Active Category {}", i);
             category.description = Some(format!("Active description {}", i));
             category.url_slug = Some(UrlSlug::from(format!("active-category-{}", i)));
             category.is_active = true; // Ensure active
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
             active_categories.push(category);
         }
 
         // Create some inactive categories
         let mut inactive_categories = Vec::new();
         for i in 0..3 {
-            let mut category = database::Category::mock();
+            let mut category = database::Categories::mock();
             category.code = format!("INACTIVE.{:03}", i);
             category.name = format!("Inactive Category {}", i);
             category.description = Some(format!("Inactive description {}", i));
             category.url_slug = Some(UrlSlug::from(format!("inactive-category-{}", i)));
             category.is_active = false; // Inactive
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
             inactive_categories.push(category);
         }
 
         // Delete inactive categories
-        let deleted_count = database::Category::delete_inactive(&pool).await.unwrap();
+        let deleted_count = database::Categories::delete_inactive(&pool).await.unwrap();
         assert_eq!(deleted_count, 3);
 
         // Verify inactive categories are gone by trying to re-insert them
         for category in &inactive_categories {
-            let reinsert_result = database::Category::insert(category, &pool).await;
+            let reinsert_result = database::Categories::insert(category, &pool).await;
             assert!(reinsert_result.is_ok()); // Should succeed as they're gone
         }
 
         // Verify active categories still exist by trying to insert duplicates (should fail as updates)
         for category in &active_categories {
-            let duplicate = database::Category {
+            let duplicate = database::Categories {
                 id: category.id,
                 ..category.clone()
             };
-            let insert_result = database::Category::insert_or_update(&duplicate, &pool).await;
+            let insert_result = database::Categories::insert_or_update(&duplicate, &pool).await;
             assert!(insert_result.is_ok()); // Should succeed (update existing)
         }
     }
@@ -516,14 +516,14 @@ mod tests {
         // Create only active categories
         let mut active_categories = Vec::with_capacity(2);
         for _ in 0..2 {
-            let mut category = database::Category::mock();
+            let mut category = database::Categories::mock();
             category.is_active = true; // Ensure category is active
-            database::Category::insert(&category, &pool).await.unwrap();
+            database::Categories::insert(&category, &pool).await.unwrap();
             active_categories.push(category);
         }
 
         // Delete inactive categories - should delete 0
-        let deleted_count = database::Category::delete_inactive(&pool).await.unwrap();
+        let deleted_count = database::Categories::delete_inactive(&pool).await.unwrap();
         assert_eq!(deleted_count, 0);
 
         // Active categories should still exist
@@ -536,11 +536,11 @@ mod tests {
         let category = create_test_category(&pool).await;
 
         // Delete by code
-        let result = database::Category::delete_by_code(&category.code, &pool).await;
+        let result = database::Categories::delete_by_code(&category.code, &pool).await;
         assert!(result.is_ok());
 
         // Verify it's gone by trying to re-insert
-        let reinsert_result = database::Category::insert(&category, &pool).await;
+        let reinsert_result = database::Categories::insert(&category, &pool).await;
         assert!(reinsert_result.is_ok()); // Should succeed as it's gone
     }
 
@@ -548,7 +548,7 @@ mod tests {
     async fn test_delete_by_code_nonexistent_category(pool: SqlitePool) {
         // Try to delete by a code that doesn't exist
         let fake_code = "NONEXISTENT.CODE";
-        let result = database::Category::delete_by_code(fake_code, &pool).await;
+        let result = database::Categories::delete_by_code(fake_code, &pool).await;
 
         // Should return NotFound error
         assert!(matches!(result, Err(database::DatabaseError::NotFound(_))));
@@ -562,15 +562,15 @@ mod tests {
         category.code = category.code.to_uppercase();
 
         // Update it in the database
-        database::Category::update(&category, &pool).await.unwrap();
+        database::Categories::update(&category, &pool).await.unwrap();
 
         // Try to delete with lowercase version - should fail
         let lowercase_code = category.code.to_lowercase();
-        let result = database::Category::delete_by_code(&lowercase_code, &pool).await;
+        let result = database::Categories::delete_by_code(&lowercase_code, &pool).await;
         assert!(matches!(result, Err(database::DatabaseError::NotFound(_))));
 
         // Delete with correct case should work
-        let result = database::Category::delete_by_code(&category.code, &pool).await;
+        let result = database::Categories::delete_by_code(&category.code, &pool).await;
         assert!(result.is_ok());
     }
 
@@ -584,14 +584,14 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify it's gone by trying to find it
-        let found = database::Category::find_by_id(category.id, &pool).await.unwrap();
+        let found = database::Categories::find_by_id(category.id, &pool).await.unwrap();
         assert!(found.is_none());
     }
 
     #[sqlx::test]
     async fn test_delete_self_nonexistent_category(pool: SqlitePool) {
         // Create a category but don't insert it
-        let category = database::Category::mock();
+        let category = database::Categories::mock();
 
         // Try to delete the non-existent category
         let result = category.delete(&pool).await;
@@ -608,14 +608,14 @@ mod tests {
 
         // Update the category
         category.name = "Updated Name".to_string();
-        let updated = database::Category::update(&category, &pool).await.unwrap();
+        let updated = database::Categories::update(&category, &pool).await.unwrap();
 
         // Delete using the updated instance
         let result = updated.delete(&pool).await;
         assert!(result.is_ok());
 
         // Verify it's gone
-        let found = database::Category::find_by_id(category.id, &pool).await.unwrap();
+        let found = database::Categories::find_by_id(category.id, &pool).await.unwrap();
         assert!(found.is_none());
     }
 }

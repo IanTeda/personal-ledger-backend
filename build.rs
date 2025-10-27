@@ -21,13 +21,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         // .out_dir("src/rpc")
         .protoc_arg("--experimental_allow_proto3_optional")
+        .protoc_arg("--proto_path=/usr/include")
         .build_client(true)
         .build_server(true)
         .build_transport(true)
         .compile_well_known_types(true)
+        .extern_path(".google.protobuf", "::prost_types")
         .file_descriptor_set_path(out_dir.join("personal_ledger_descriptor.bin"))
         .compile_protos(
-          &["proto/utilities.proto"], 
-          &["proto/"])?;
+          &["proto/utilities.proto", "proto/categories.proto"], 
+          &["proto/", "/usr/include"])?;
     Ok(())
 }

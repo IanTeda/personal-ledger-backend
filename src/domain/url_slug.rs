@@ -158,6 +158,7 @@ impl UrlSlug {
     }
 
     /// Validate that a string is a valid slug.
+    #[allow(dead_code)]
     fn validate_slug(s: &str) -> Result<(), UrlSlugError> {
         if s.is_empty() {
             return Err(UrlSlugError::EmptySlug);

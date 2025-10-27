@@ -24,6 +24,9 @@ mod proto {
         tonic::include_file_descriptor_set!("personal_ledger_descriptor");
 }
 
+/// File descriptor set for gRPC reflection.
+pub use proto::FILE_DESCRIPTOR_SET;
+
 /// gRPC client for the `UtilitiesService`.
 pub use proto::utilities_service_client::UtilitiesServiceClient;
 
@@ -33,5 +36,28 @@ pub use proto::utilities_service_server::{UtilitiesService, UtilitiesServiceServ
 /// Request and response message types for the Ping endpoint.
 pub use proto::{PingRequest, PingResponse};
 
-/// File descriptor set for gRPC reflection.
-pub use proto::FILE_DESCRIPTOR_SET;
+/// gRPC client for the `CategoriesService`.
+pub use proto::categories_service_client::CategoriesServiceClient;
+
+/// gRPC server and trait for the `CategoriesService`.
+pub use proto::categories_service_server::{CategoriesService, CategoriesServiceServer};
+
+/// Message types for categories.
+pub use proto::{
+    Category, CategoryTypes,
+    CategoryCreateRequest, CategoryCreateResponse,
+    CategoryGetRequest, CategoryGetResponse,
+    CategoryGetByCodeRequest, CategoryGetByCodeResponse,
+    CategoryGetBySlugRequest, CategoryGetBySlugResponse,
+    CategoriesListRequest, CategoriesListResponse,
+    CategoryUpdateRequest, CategoryUpdateResponse,
+    CategoriesCreateBatchRequest, CategoriesCreateBatchResponse,
+    CategoryDeleteRequest, CategoryDeleteResponse,
+    CategoriesDeleteBatchRequest, CategoriesDeleteBatchResponse,
+    CategoryActivateRequest, CategoryActivateResponse,
+    CategoryDeactivateRequest, CategoryDeactivateResponse,
+};
+
+/// Google protobuf types used in the API.
+pub use prost_types::{Timestamp, FieldMask};
+

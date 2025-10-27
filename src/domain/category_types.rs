@@ -168,6 +168,51 @@ impl CategoryTypes {
         let random_index: usize = (0..all_types.len()).fake();
         all_types[random_index].clone()
     }
+
+    /// Convert this CategoryTypes to the corresponding RPC CategoryType enum value as i32.
+    ///
+    /// This method provides a clean way to convert domain types to RPC types
+    /// for use in gRPC service implementations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use personal_ledger_backend::domain::CategoryTypes;
+    ///
+    /// let domain_type = CategoryTypes::Asset;
+    /// let rpc_type_value = domain_type.to_rpc_i32();
+    /// // rpc_type_value will be the i32 value of the corresponding rpc::CategoryType
+    /// ```
+    pub fn to_rpc_i32(&self) -> i32 {
+        match self {
+            CategoryTypes::Asset => crate::rpc::CategoryTypes::Asset as i32,
+            CategoryTypes::Equity => crate::rpc::CategoryTypes::Equity as i32,
+            CategoryTypes::Expense => crate::rpc::CategoryTypes::Expense as i32,
+            CategoryTypes::Income => crate::rpc::CategoryTypes::Income as i32,
+            CategoryTypes::Liability => crate::rpc::CategoryTypes::Liability as i32,
+        }
+    }
+
+    /// Convert from the protobuf i32 enum value to CategoryTypes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use personal_ledger_backend::domain::CategoryTypes;
+    ///
+    /// let asset = CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Asset as i32).unwrap();
+    /// assert_eq!(asset, CategoryTypes::Asset);
+    /// ```
+    pub fn from_rpc_i32(value: i32) -> Result<Self, String> {
+        match value {
+            x if x == crate::rpc::CategoryTypes::Asset as i32 => Ok(CategoryTypes::Asset),
+            x if x == crate::rpc::CategoryTypes::Equity as i32 => Ok(CategoryTypes::Equity),
+            x if x == crate::rpc::CategoryTypes::Expense as i32 => Ok(CategoryTypes::Expense),
+            x if x == crate::rpc::CategoryTypes::Income as i32 => Ok(CategoryTypes::Income),
+            x if x == crate::rpc::CategoryTypes::Liability as i32 => Ok(CategoryTypes::Liability),
+            _ => Err(format!("Invalid category type value: {}", value)),
+        }
+    }
 }
 
 // SQLx trait implementations for database integration
@@ -390,5 +435,29 @@ mod tests {
         
         // Should be parseable back from its string representation
         assert_eq!(CategoryTypes::from_str(mock_type.as_str()), Ok(mock_type));
+    }
+
+    #[test]
+    fn test_to_rpc_i32() {
+        // Test conversion to RPC i32 values
+        assert_eq!(CategoryTypes::Asset.to_rpc_i32(), crate::rpc::CategoryTypes::Asset as i32);
+        assert_eq!(CategoryTypes::Equity.to_rpc_i32(), crate::rpc::CategoryTypes::Equity as i32);
+        assert_eq!(CategoryTypes::Expense.to_rpc_i32(), crate::rpc::CategoryTypes::Expense as i32);
+        assert_eq!(CategoryTypes::Income.to_rpc_i32(), crate::rpc::CategoryTypes::Income as i32);
+        assert_eq!(CategoryTypes::Liability.to_rpc_i32(), crate::rpc::CategoryTypes::Liability as i32);
+    }
+
+    #[test]
+    fn test_from_rpc_i32() {
+        // Test conversion from RPC i32 values
+        assert_eq!(CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Asset as i32), Ok(CategoryTypes::Asset));
+        assert_eq!(CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Equity as i32), Ok(CategoryTypes::Equity));
+        assert_eq!(CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Expense as i32), Ok(CategoryTypes::Expense));
+        assert_eq!(CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Income as i32), Ok(CategoryTypes::Income));
+        assert_eq!(CategoryTypes::from_rpc_i32(crate::rpc::CategoryTypes::Liability as i32), Ok(CategoryTypes::Liability));
+        
+        // Invalid values should return an error
+        assert!(CategoryTypes::from_rpc_i32(-1).is_err());
+        assert!(CategoryTypes::from_rpc_i32(999).is_err());
     }
 }

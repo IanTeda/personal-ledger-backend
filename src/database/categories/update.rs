@@ -5,7 +5,7 @@ use crate::domain;
 ///
 /// This module provides functions for updating existing category records in the database,
 /// including single record updates, bulk updates, and specialized update operations.
-impl database::Category {
+impl database::Categories {
     /// Updates an existing category in the database.
     ///
     /// This function updates all fields of the category record identified by the `id` field.
@@ -96,7 +96,7 @@ impl database::Category {
 
         // Read back the updated category
         let updated = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -220,7 +220,7 @@ impl database::Category {
 
             // Read back the updated category
             let updated = sqlx::query_as!(
-                database::Category,
+                database::Categories,
                 r#"
                     SELECT
                         id              AS "id!: domain::RowID",
@@ -330,7 +330,7 @@ impl database::Category {
 
         // Read back the updated category
         let updated = sqlx::query_as!(
-            database::Category,
+            database::Categories,
             r#"
                 SELECT
                     id              AS "id!: domain::RowID",
@@ -368,7 +368,7 @@ pub mod tests {
     #[sqlx::test]
     async fn update_existing_category_success(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // First insert a category
-        let original = database::Category::mock();
+        let original = database::Categories::mock();
         let inserted = original.insert(&pool).await?;
 
         // Update the category
@@ -377,7 +377,7 @@ pub mod tests {
         let original_code = inserted.code.clone();
         let original_created_on = inserted.created_on;
 
-        let updated_category = database::Category {
+        let updated_category = database::Categories {
             name: updated_name.clone(),
             description: updated_description.clone(),
             updated_on: chrono::Utc::now(),
@@ -399,7 +399,7 @@ pub mod tests {
 
     #[sqlx::test]
     async fn update_nonexistent_category_fails(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let fake_category = database::Category::mock();
+        let fake_category = database::Categories::mock();
 
         let result = fake_category.update(&pool).await;
 
@@ -413,14 +413,14 @@ pub mod tests {
     #[sqlx::test]
     async fn update_category_with_duplicate_name_fails(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // Insert two categories
-        let category1 = database::Category::mock();
+        let category1 = database::Categories::mock();
         let inserted1 = category1.insert(&pool).await?;
 
-        let category2 = database::Category::mock();
+        let category2 = database::Categories::mock();
         let inserted2 = category2.insert(&pool).await?;
 
         // Try to update category2 with the same name as category1
-        let updated_category2 = database::Category {
+        let updated_category2 = database::Categories {
             name: inserted1.name.clone(),
             updated_on: chrono::Utc::now(),
             ..inserted2
@@ -435,14 +435,14 @@ pub mod tests {
     #[sqlx::test]
     async fn update_many_success(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // Insert multiple categories
-        let categories = vec![database::Category::mock(), database::Category::mock()];
-        let inserted = database::Category::insert_many(&categories, &pool).await?;
+        let categories = vec![database::Categories::mock(), database::Categories::mock()];
+        let inserted = database::Categories::insert_many(&categories, &pool).await?;
         assert_eq!(inserted.len(), 2);
 
         // Update them
         let updates = inserted
             .into_iter()
-            .map(|cat| database::Category {
+            .map(|cat| database::Categories {
                 name: format!("Updated {}", cat.name),
                 description: Some(format!("Updated description for {}", cat.name)),
                 updated_on: chrono::Utc::now(),
@@ -450,7 +450,7 @@ pub mod tests {
             })
             .collect::<Vec<_>>();
 
-        let updated = database::Category::update_many(&updates, &pool).await?;
+        let updated = database::Categories::update_many(&updates, &pool).await?;
 
         assert_eq!(updated.len(), 2);
         for cat in updated.iter() {
@@ -463,9 +463,9 @@ pub mod tests {
 
     #[sqlx::test]
     async fn update_many_empty_list(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
-        let categories: Vec<database::Category> = vec![];
+        let categories: Vec<database::Categories> = vec![];
 
-        let result = database::Category::update_many(&categories, &pool).await?;
+        let result = database::Categories::update_many(&categories, &pool).await?;
 
         assert!(result.is_empty());
 
@@ -475,25 +475,25 @@ pub mod tests {
     #[sqlx::test]
     async fn update_many_with_nonexistent_category_fails(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // Insert one category
-        let category = database::Category::mock();
+        let category = database::Categories::mock();
         let inserted = category.insert(&pool).await?;
 
         // Create updates including a nonexistent category
-        let fake_category = database::Category::mock();
+        let fake_category = database::Categories::mock();
         let updates = vec![
-            database::Category {
+            database::Categories {
                 name: "Updated existing".to_string(),
                 updated_on: chrono::Utc::now(),
                 ..inserted
             },
-            database::Category {
+            database::Categories {
                 name: "Nonexistent".to_string(),
                 updated_on: chrono::Utc::now(),
                 ..fake_category
             },
         ];
 
-        let result = database::Category::update_many(&updates, &pool).await;
+        let result = database::Categories::update_many(&updates, &pool).await;
         assert!(result.is_err());
 
         Ok(())
@@ -502,19 +502,19 @@ pub mod tests {
     #[sqlx::test]
     async fn update_active_status_success(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // Insert a category
-        let mut category = database::Category::mock();
+        let mut category = database::Categories::mock();
         category.is_active = true;
         let inserted = category.insert(&pool).await?;
         assert!(inserted.is_active);
 
         // Deactivate it
-        let deactivated = database::Category::update_active_status(inserted.id, false, &pool).await?;
+        let deactivated = database::Categories::update_active_status(inserted.id, false, &pool).await?;
         assert_eq!(deactivated.id, inserted.id);
         assert!(!deactivated.is_active);
         assert_ne!(deactivated.updated_on, inserted.updated_on);
 
         // Reactivate it
-        let reactivated = database::Category::update_active_status(inserted.id, true, &pool).await?;
+        let reactivated = database::Categories::update_active_status(inserted.id, true, &pool).await?;
         assert_eq!(reactivated.id, inserted.id);
         assert!(reactivated.is_active);
         assert_ne!(reactivated.updated_on, deactivated.updated_on);
@@ -526,7 +526,7 @@ pub mod tests {
     async fn update_active_status_nonexistent_category_fails(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         let fake_id = domain::RowID::new();
 
-        let result = database::Category::update_active_status(fake_id, false, &pool).await;
+        let result = database::Categories::update_active_status(fake_id, false, &pool).await;
 
         assert!(result.is_err());
         assert!(matches!(result, Err(database::DatabaseError::NotFound(_))));
@@ -537,13 +537,13 @@ pub mod tests {
     #[sqlx::test]
     async fn update_preserves_created_on_timestamp(pool: sqlx::Pool<sqlx::Sqlite>) -> Result<()> {
         // Insert a category
-        let category = database::Category::mock();
+        let category = database::Categories::mock();
         let inserted = category.insert(&pool).await?;
         let original_created_on = inserted.created_on;
 
         // Wait a bit and update
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        let updated_category = database::Category {
+        let updated_category = database::Categories {
             name: "Updated Name".to_string(),
             updated_on: chrono::Utc::now(),
             ..inserted
