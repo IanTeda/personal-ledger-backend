@@ -51,9 +51,9 @@ pub use proto::{
     CategoryGetBySlugRequest, CategoryGetBySlugResponse,
     CategoriesListRequest, CategoriesListResponse,
     CategoryUpdateRequest, CategoryUpdateResponse,
-    CategoriesBatchCreateRequest, CategoriesBatchCreateResponse,
+    CategoriesCreateBatchRequest, CategoriesCreateBatchResponse,
     CategoryDeleteRequest, CategoryDeleteResponse,
-    CategoriesBatchDeleteRequest, CategoriesBatchDeleteResponse,
+    CategoriesDeleteBatchRequest, CategoriesDeleteBatchResponse,
     CategoryActivateRequest, CategoryActivateResponse,
     CategoryDeactivateRequest, CategoryDeactivateResponse,
 };

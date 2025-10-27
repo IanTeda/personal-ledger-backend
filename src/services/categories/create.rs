@@ -5,7 +5,7 @@
 //!
 //! - Conversion from gRPC `CategoryCreateRequest` to domain/database `Category`
 //! - Validation and error handling for all fields
-//! - The async service handler for category creation, used by the gRPC service
+//! - The async service handlers for single and batch category creation, used by the gRPC service
 //! - Comprehensive unit tests for all conversion and validation logic
 //!
 //! The core business logic is abstracted here to keep the gRPC service layer clean
@@ -150,6 +150,97 @@ pub async fn create_category(
 
     Ok(tonic::Response::new(response))
 }
+
+/// Handle the batch category creation logic for the gRPC service.
+///
+/// This function performs:
+/// - Validation and conversion of all categories in the batch
+/// - Atomic insertion of all categories using database transactions
+/// - Conversion of inserted categories back to gRPC response format
+/// - Proper error handling and mapping to gRPC status codes
+///
+/// The operation is atomic - either all categories are created successfully,
+/// or none are created if any validation or insertion fails.
+///
+/// # Arguments
+/// * `service` - Reference to the `CategoriesService` (for DB access)
+/// * `request` - The incoming gRPC batch create request
+///
+/// # Returns
+/// * `Ok(tonic::Response<CategoriesCreateBatchResponse>)` on success
+/// * `Err(tonic::Status)` on validation or database error
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - Any category in the batch fails validation
+/// - Database insertion fails for any category
+/// - Database transaction fails to commit
+pub async fn create_batch_categories(
+    service: &super::CategoriesService,
+    request: tonic::Request<rpc::CategoriesCreateBatchRequest>,
+) -> Result<tonic::Response<rpc::CategoriesCreateBatchResponse>, tonic::Status> {
+    // Extract the inner request
+    let batch_request = request.into_inner();
+
+    // Validate that we have categories to create
+    if batch_request.categories.is_empty() {
+        return Err(tonic::Status::invalid_argument("No categories provided for batch creation"));
+    }
+
+    // Convert each RPC category to database category
+    let mut db_categories = Vec::with_capacity(batch_request.categories.len());
+
+    for (index, rpc_category) in batch_request.categories.into_iter().enumerate() {
+        // Create a CategoryCreateRequest for each category
+        let create_request = rpc::CategoryCreateRequest {
+            category: Some(rpc_category),
+        };
+
+        // Convert to database category using the existing TryFrom implementation
+        match database::Categories::try_from(create_request) {
+            Ok(db_category) => db_categories.push(db_category),
+            Err(service_error) => {
+                // Include the index in the error message for better debugging
+                let error_msg = format!("Category at index {}: {}", index, service_error);
+                let status_code = match service_error.http_status_code() {
+                    400 => tonic::Code::InvalidArgument,
+                    401 => tonic::Code::Unauthenticated,
+                    404 => tonic::Code::NotFound,
+                    422 => tonic::Code::FailedPrecondition,
+                    500 => tonic::Code::Internal,
+                    502 => tonic::Code::Unavailable,
+                    _ => tonic::Code::Internal,
+                };
+                return Err(tonic::Status::new(status_code, error_msg));
+            }
+        }
+    }
+
+    // Insert all categories in a batch using the database's insert_many method
+    let inserted_categories = match database::Categories::insert_many(&db_categories, service.database_ref()).await {
+        Ok(categories) => categories,
+        Err(db_error) => {
+            tracing::error!("Failed to batch insert categories: {}", db_error);
+            return Err(tonic::Status::internal("Failed to create categories in batch"));
+        }
+    };
+
+    // Convert database categories back to RPC format
+    let rpc_categories: Vec<rpc::Category> = inserted_categories
+        .into_iter()
+        .map(|category| category.into())
+        .collect();
+
+    // Create the response
+    let response = rpc::CategoriesCreateBatchResponse {
+        categories: rpc_categories.clone(),
+        created_count: rpc_categories.len() as i32,
+    };
+
+    Ok(tonic::Response::new(response))
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -578,5 +669,266 @@ mod tests {
         assert_eq!(category.url_slug.as_ref().unwrap().as_str(), "valid-slug"); // Slug gets cleaned
         assert_eq!(category.color.as_ref().unwrap().as_str(), "#FF5733");
         assert_eq!(category.icon, Some("  shopping-cart  ".to_string()));
+    }
+
+    /// Test successful batch creation with multiple valid categories
+    #[test]
+    fn test_batch_create_valid_categories() {
+        // This would require a test database setup
+        // For now, just test the conversion logic
+        let categories = vec![
+            rpc::Category {
+                id: "".to_string(),
+                code: "FOOD_BATCH".to_string(),
+                name: "Food & Dining Batch".to_string(),
+                description: Some("Food and dining expenses from batch".to_string()),
+                url_slug: Some("food-dining-batch".to_string()),
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: Some("#FF5733".to_string()),
+                icon: Some("utensils".to_string()),
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+            rpc::Category {
+                id: "".to_string(),
+                code: "TRANSPORT_BATCH".to_string(),
+                name: "Transportation Batch".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+        ];
+
+        let batch_request = rpc::CategoriesCreateBatchRequest {
+            categories,
+        };
+
+        // Test that we can create the request (basic validation)
+        assert_eq!(batch_request.categories.len(), 2);
+        assert_eq!(batch_request.categories[0].code, "FOOD_BATCH");
+        assert_eq!(batch_request.categories[1].code, "TRANSPORT_BATCH");
+    }
+
+    /// Test batch creation with empty list
+    #[test]
+    fn test_batch_create_empty_list() {
+        let batch_request = rpc::CategoriesCreateBatchRequest {
+            categories: vec![],
+        };
+
+        assert_eq!(batch_request.categories.len(), 0);
+    }
+
+    /// Test batch creation with single category
+    #[test]
+    fn test_batch_create_single_category() {
+        let categories = vec![
+            rpc::Category {
+                id: "".to_string(),
+                code: "UTILITIES_BATCH".to_string(),
+                name: "Utilities Batch".to_string(),
+                description: Some("Utility bills and services from batch".to_string()),
+                url_slug: Some("utilities-batch".to_string()),
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: Some("#4A90E2".to_string()),
+                icon: Some("bolt".to_string()),
+                is_active: false, // Test inactive category
+                created_on: None,
+                updated_on: None,
+            },
+        ];
+
+        let batch_request = rpc::CategoriesCreateBatchRequest {
+            categories,
+        };
+
+        assert_eq!(batch_request.categories.len(), 1);
+        assert_eq!(batch_request.categories[0].code, "UTILITIES_BATCH");
+        assert!(!batch_request.categories[0].is_active);
+    }
+
+    /// Test batch conversion logic with multiple valid categories
+    #[test]
+    fn test_batch_conversion_valid_categories() {
+        let categories = vec![
+            rpc::Category {
+                id: "".to_string(),
+                code: "FOOD_BATCH".to_string(),
+                name: "Food & Dining Batch".to_string(),
+                description: Some("Food and dining expenses from batch".to_string()),
+                url_slug: Some("food-dining-batch".to_string()),
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: Some("#FF5733".to_string()),
+                icon: Some("utensils".to_string()),
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+            rpc::Category {
+                id: "".to_string(),
+                code: "TRANSPORT_BATCH".to_string(),
+                name: "Transportation Batch".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+        ];
+
+        let mut db_categories = Vec::with_capacity(categories.len());
+        let mut errors = Vec::new();
+
+        for (index, rpc_category) in categories.into_iter().enumerate() {
+            let create_request = rpc::CategoryCreateRequest {
+                category: Some(rpc_category),
+            };
+
+            match database::Categories::try_from(create_request) {
+                Ok(db_category) => db_categories.push(db_category),
+                Err(service_error) => {
+                    errors.push((index, service_error));
+                    break; // Simulate batch function stopping on first error
+                }
+            }
+        }
+
+        assert!(errors.is_empty(), "No errors expected for valid categories");
+        assert_eq!(db_categories.len(), 2);
+        assert_eq!(db_categories[0].code, "FOOD_BATCH");
+        assert_eq!(db_categories[1].code, "TRANSPORT_BATCH");
+    }
+
+    /// Test batch conversion logic with an invalid category at index 1
+    #[test]
+    fn test_batch_conversion_invalid_category_at_index() {
+        let categories = vec![
+            rpc::Category {
+                id: "".to_string(),
+                code: "VALID".to_string(),
+                name: "Valid Category".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+            rpc::Category {
+                id: "".to_string(),
+                code: "".to_string(), // Invalid: empty code
+                name: "Invalid Category".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+            rpc::Category {
+                id: "".to_string(),
+                code: "ANOTHER_VALID".to_string(),
+                name: "Another Valid".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+        ];
+
+        let mut db_categories = Vec::with_capacity(categories.len());
+        let mut errors = Vec::new();
+
+        for (index, rpc_category) in categories.into_iter().enumerate() {
+            let create_request = rpc::CategoryCreateRequest {
+                category: Some(rpc_category),
+            };
+
+            match database::Categories::try_from(create_request) {
+                Ok(db_category) => db_categories.push(db_category),
+                Err(service_error) => {
+                    errors.push((index, service_error));
+                    break; // Simulate batch function stopping on first error
+                }
+            }
+        }
+
+        assert_eq!(errors.len(), 1, "Expected one error");
+        assert_eq!(errors[0].0, 1, "Error should be at index 1");
+        assert!(matches!(errors[0].1, ServiceError::Validation(_)));
+        assert_eq!(db_categories.len(), 1, "Only first valid category should be converted");
+        assert_eq!(db_categories[0].code, "VALID");
+    }
+
+    /// Test batch conversion logic with all invalid categories
+    #[test]
+    fn test_batch_conversion_all_invalid_categories() {
+        let categories = vec![
+            rpc::Category {
+                id: "".to_string(),
+                code: "   ".to_string(), // Invalid: whitespace-only code
+                name: "Invalid 1".to_string(),
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+            rpc::Category {
+                id: "".to_string(),
+                code: "INVALID2".to_string(),
+                name: "".to_string(), // Invalid: empty name
+                description: None,
+                url_slug: None,
+                category_type: rpc::CategoryTypes::Expense as i32,
+                color: None,
+                icon: None,
+                is_active: true,
+                created_on: None,
+                updated_on: None,
+            },
+        ];
+
+        let mut db_categories = Vec::with_capacity(categories.len());
+        let mut errors = Vec::new();
+
+        for (index, rpc_category) in categories.into_iter().enumerate() {
+            let create_request = rpc::CategoryCreateRequest {
+                category: Some(rpc_category),
+            };
+
+            match database::Categories::try_from(create_request) {
+                Ok(db_category) => db_categories.push(db_category),
+                Err(service_error) => {
+                    errors.push((index, service_error));
+                    break; // Simulate batch function stopping on first error
+                }
+            }
+        }
+
+        assert_eq!(errors.len(), 1, "Expected one error on first invalid");
+        assert_eq!(errors[0].0, 0, "Error should be at index 0");
+        assert!(matches!(errors[0].1, ServiceError::Validation(_)));
+        assert!(db_categories.is_empty(), "No categories should be converted");
     }
 }

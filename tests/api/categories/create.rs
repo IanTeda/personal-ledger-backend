@@ -316,3 +316,603 @@ async fn create_succeeds_with_minimal_valid_request(database_pool: sqlx::SqliteP
 
     Ok(())
 }
+
+#[sqlx::test]
+async fn batch_create_succeeds_with_multiple_categories(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    // Create multiple categories for batch creation
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "FOOD_BATCH".to_string(),
+            name: "Food & Dining Batch".to_string(),
+            description: Some("Food and dining expenses from batch".to_string()),
+            url_slug: Some("food-dining-batch".to_string()),
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: Some("#FF5733".to_string()),
+            icon: Some("utensils".to_string()),
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "TRANSPORT_BATCH".to_string(),
+            name: "Transportation Batch".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "UTILITIES_BATCH".to_string(),
+            name: "Utilities Batch".to_string(),
+            description: Some("Utility bills and services from batch".to_string()),
+            url_slug: Some("utilities-batch".to_string()),
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: Some("#4A90E2".to_string()),
+            icon: Some("bolt".to_string()),
+            is_active: false, // Test inactive category
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories.clone()
+    };
+    let request = tonic::Request::new(request_message);
+    let response = tonic_client.category().categories_create_batch(request).await?;
+    let response_message = response.into_inner();
+
+    // Verify response
+    assert_eq!(response_message.created_count, 3);
+    assert_eq!(response_message.categories.len(), 3);
+
+    // Verify each created category
+    for (i, created_category) in response_message.categories.iter().enumerate() {
+        let original = &rpc_categories[i];
+
+        // Verify required fields are preserved
+        assert_eq!(created_category.code, original.code);
+        assert_eq!(created_category.name, original.name);
+        assert_eq!(created_category.category_type, original.category_type);
+        assert_eq!(created_category.is_active, original.is_active);
+
+        // Verify optional fields
+        assert_eq!(created_category.description, original.description);
+        assert_eq!(created_category.url_slug, original.url_slug);
+        assert_eq!(created_category.color, original.color);
+        assert_eq!(created_category.icon, original.icon);
+
+        // Verify server-generated fields
+        assert_ne!(created_category.id, original.id); // Should be different from empty string
+        assert!(created_category.created_on.is_some());
+        assert!(created_category.updated_on.is_some());
+
+        // Verify ID is valid UUID v7
+        let parsed_id: domain::RowID = created_category.id.parse()
+            .expect("Server should return valid RowID");
+        assert_eq!(parsed_id.as_uuid().get_version_num(), 7);
+    }
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_empty_list(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: vec![]
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_invalid_category(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "VALID".to_string(),
+            name: "Valid Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "".to_string(), // Invalid: empty code
+            name: "Invalid Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err()); // Should fail due to invalid category at index 1
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_duplicate_codes_in_batch(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "DUPLICATE".to_string(),
+            name: "First Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "DUPLICATE".to_string(), // Same code as first
+            name: "Second Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err()); // Should fail due to duplicate codes in the batch
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_succeeds_with_different_category_types(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    // Create categories with different category types
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "ASSET_BATCH".to_string(),
+            name: "Asset Category Batch".to_string(),
+            description: Some("Asset category from batch".to_string()),
+            url_slug: Some("asset-batch".to_string()),
+            category_type: rpc::CategoryTypes::Asset as i32,
+            color: Some("#228B22".to_string()),
+            icon: Some("bank".to_string()),
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "LIABILITY_BATCH".to_string(),
+            name: "Liability Category Batch".to_string(),
+            description: Some("Liability category from batch".to_string()),
+            url_slug: Some("liability-batch".to_string()),
+            category_type: rpc::CategoryTypes::Liability as i32,
+            color: Some("#DC143C".to_string()),
+            icon: Some("credit-card".to_string()),
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "EQUITY_BATCH".to_string(),
+            name: "Equity Category Batch".to_string(),
+            description: Some("Equity category from batch".to_string()),
+            url_slug: Some("equity-batch".to_string()),
+            category_type: rpc::CategoryTypes::Equity as i32,
+            color: Some("#FFD700".to_string()),
+            icon: Some("chart-line".to_string()),
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "INCOME_BATCH".to_string(),
+            name: "Income Category Batch".to_string(),
+            description: Some("Income category from batch".to_string()),
+            url_slug: Some("income-batch".to_string()),
+            category_type: rpc::CategoryTypes::Income as i32,
+            color: Some("#32CD32".to_string()),
+            icon: Some("dollar-sign".to_string()),
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories.clone()
+    };
+    let request = tonic::Request::new(request_message);
+    let response = tonic_client.category().categories_create_batch(request).await?;
+    let response_message = response.into_inner();
+
+    // Verify response
+    assert_eq!(response_message.created_count, 4);
+    assert_eq!(response_message.categories.len(), 4);
+
+    // Verify each created category has the correct type
+    let expected_types = vec![
+        rpc::CategoryTypes::Asset,
+        rpc::CategoryTypes::Liability,
+        rpc::CategoryTypes::Equity,
+        rpc::CategoryTypes::Income,
+    ];
+
+    for (i, created_category) in response_message.categories.iter().enumerate() {
+        let original = &rpc_categories[i];
+        let expected_type = expected_types[i];
+
+        // Verify required fields are preserved
+        assert_eq!(created_category.code, original.code);
+        assert_eq!(created_category.name, original.name);
+        assert_eq!(created_category.category_type, expected_type as i32);
+        assert_eq!(created_category.is_active, original.is_active);
+
+        // Verify optional fields
+        assert_eq!(created_category.description, original.description);
+        assert_eq!(created_category.url_slug, original.url_slug);
+        assert_eq!(created_category.color, original.color);
+        assert_eq!(created_category.icon, original.icon);
+
+        // Verify server-generated fields
+        assert_ne!(created_category.id, original.id);
+        assert!(created_category.created_on.is_some());
+        assert!(created_category.updated_on.is_some());
+    }
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_invalid_category_type(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "VALID_TYPE".to_string(),
+            name: "Valid Type Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "INVALID_TYPE".to_string(),
+            name: "Invalid Type Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: 999, // Invalid category type
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err()); // Should fail due to invalid category type
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_invalid_color_format(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "VALID_COLOR".to_string(),
+            name: "Valid Color Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: Some("#FF5733".to_string()), // Valid color
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "INVALID_COLOR".to_string(),
+            name: "Invalid Color Category".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: Some("invalid-color".to_string()), // Invalid color format
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err()); // Should fail due to invalid color format
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_duplicate_code_against_existing(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    // Create first category
+    let rpc_category1 = categories::mock_rpc_category();
+    let request_message1 = rpc::CategoryCreateRequest {
+        category: Some(rpc_category1.clone())
+    };
+    let request1 = tonic::Request::new(request_message1);
+    let response1 = tonic_client.category().category_create(request1).await?;
+    assert!(response1.into_inner().category.is_some());
+
+    // Try to create batch with same code
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: rpc_category1.code.clone(), // Same code as existing
+            name: "Different Name".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message2 = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request2 = tonic::Request::new(request_message2);
+    let result = tonic_client.category().categories_create_batch(request2).await;
+
+    assert!(result.is_err()); // Should fail due to duplicate code against existing data
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_duplicate_name_against_existing(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    // Create first category
+    let rpc_category1 = categories::mock_rpc_category();
+    let request_message1 = rpc::CategoryCreateRequest {
+        category: Some(rpc_category1.clone())
+    };
+    let request1 = tonic::Request::new(request_message1);
+    let response1 = tonic_client.category().category_create(request1).await?;
+    assert!(response1.into_inner().category.is_some());
+
+    // Try to create batch with same name
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "DIFFERENT_CODE".to_string(), // Different code
+            name: rpc_category1.name.clone(), // Same name as existing
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message2 = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request2 = tonic::Request::new(request_message2);
+    let result = tonic_client.category().categories_create_batch(request2).await;
+
+    assert!(result.is_err()); // Should fail due to duplicate name against existing data
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_succeeds_with_minimal_valid_requests(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    // Create categories with only required fields
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "MINIMAL1".to_string(),
+            name: "Minimal Category 1".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "MINIMAL2".to_string(),
+            name: "Minimal Category 2".to_string(),
+            description: None,
+            url_slug: None,
+            category_type: rpc::CategoryTypes::Income as i32,
+            color: None,
+            icon: None,
+            is_active: false, // Test inactive
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories.clone()
+    };
+    let request = tonic::Request::new(request_message);
+    let response = tonic_client.category().categories_create_batch(request).await?;
+    let response_message = response.into_inner();
+
+    assert_eq!(response_message.created_count, 2);
+    assert_eq!(response_message.categories.len(), 2);
+
+    // Verify each created category
+    for (i, created_category) in response_message.categories.iter().enumerate() {
+        let original = &rpc_categories[i];
+
+        // Verify required fields are preserved
+        assert_eq!(created_category.code, original.code);
+        assert_eq!(created_category.name, original.name);
+        assert_eq!(created_category.category_type, original.category_type);
+        assert_eq!(created_category.is_active, original.is_active);
+
+        // Verify optional fields are None/empty
+        assert!(created_category.description.is_none());
+        assert!(created_category.url_slug.is_none());
+        assert!(created_category.color.is_none());
+        assert!(created_category.icon.is_none());
+
+        // Verify server-generated fields
+        assert_ne!(created_category.id, original.id);
+        assert!(created_category.created_on.is_some());
+        assert!(created_category.updated_on.is_some());
+    }
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn batch_create_fails_with_invalid_url_slug(database_pool: sqlx::SqlitePool) -> Result<()> {
+    let tonic_server = helpers::SpawnTonicServer::init(database_pool).await?;
+    let transport_channel = tonic_server.transport_channel();
+    let mut tonic_client = helpers::SpawnTonicClient::new(transport_channel);
+
+    let rpc_categories = vec![
+        rpc::Category {
+            id: "".to_string(),
+            code: "VALID_SLUG".to_string(),
+            name: "Valid Slug Category".to_string(),
+            description: None,
+            url_slug: Some("valid-slug".to_string()), // Valid slug
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+        rpc::Category {
+            id: "".to_string(),
+            code: "INVALID_SLUG".to_string(),
+            name: "Invalid Slug Category".to_string(),
+            description: None,
+            url_slug: Some("!@#$%^&*()".to_string()), // Invalid slug characters
+            category_type: rpc::CategoryTypes::Expense as i32,
+            color: None,
+            icon: None,
+            is_active: true,
+            created_on: None,
+            updated_on: None,
+        },
+    ];
+
+    let request_message = rpc::CategoriesCreateBatchRequest {
+        categories: rpc_categories
+    };
+    let request = tonic::Request::new(request_message);
+    let result = tonic_client.category().categories_create_batch(request).await;
+
+    assert!(result.is_err()); // Should fail due to invalid URL slug
+
+    Ok(())
+}

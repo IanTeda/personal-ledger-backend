@@ -1,10 +1,9 @@
-#![allow(unused)] // For development only
+// #![allow(unused)] // For development only
 
 use std::sync::Arc;
 
 use crate::{database, rpc, LedgerConfig};
 use tonic;
-use tracing;
 
 pub struct CategoriesService {
     database_pool: Arc<sqlx::SqlitePool>,
@@ -67,14 +66,6 @@ impl crate::rpc::CategoriesService for CategoriesService {
         crate::services::categories::create::create_category(self, request).await
     }
 
-    // Stub implementations for other methods - to be implemented later
-    async fn categories_batch_create(
-        &self,
-        _request: tonic::Request<crate::rpc::CategoriesBatchCreateRequest>,
-    ) -> Result<tonic::Response<crate::rpc::CategoriesBatchCreateResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("categories_batch_create not implemented"))
-    }
-
     async fn category_get(
         &self,
         _request: tonic::Request<crate::rpc::CategoryGetRequest>,
@@ -117,13 +108,6 @@ impl crate::rpc::CategoriesService for CategoriesService {
         Err(tonic::Status::unimplemented("category_delete not implemented"))
     }
 
-    async fn categories_batch_delete(
-        &self,
-        _request: tonic::Request<crate::rpc::CategoriesBatchDeleteRequest>,
-    ) -> Result<tonic::Response<crate::rpc::CategoriesBatchDeleteResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("categories_batch_delete not implemented"))
-    }
-
     async fn category_activate(
         &self,
         _request: tonic::Request<crate::rpc::CategoryActivateRequest>,
@@ -136,6 +120,20 @@ impl crate::rpc::CategoriesService for CategoriesService {
         _request: tonic::Request<crate::rpc::CategoryDeactivateRequest>,
     ) -> Result<tonic::Response<crate::rpc::CategoryDeactivateResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("category_deactivate not implemented"))
+    }
+
+    async fn categories_create_batch(
+        &self,
+        request: tonic::Request<crate::rpc::CategoriesCreateBatchRequest>,
+    ) -> Result<tonic::Response<crate::rpc::CategoriesCreateBatchResponse>, tonic::Status> {
+        crate::services::categories::create::create_batch_categories(self, request).await
+    }
+
+    async fn categories_delete_batch(
+        &self,
+        _request: tonic::Request<crate::rpc::CategoriesDeleteBatchRequest>,
+    ) -> Result<tonic::Response<crate::rpc::CategoriesDeleteBatchResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("categories_delete_batch not implemented"))
     }
 }
 
