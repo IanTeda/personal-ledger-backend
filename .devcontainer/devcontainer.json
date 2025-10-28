@@ -46,7 +46,8 @@
         "usernamehw.errorlens",
         "vadimcn.vscode-lldb",
         "zxh404.vscode-proto3",
-        "qwtel.sqlite-viewer"
+        "qwtel.sqlite-viewer",
+        "vector-of-bool.gitflow"
       ],
       "settings": {
         "sqltools.useConnectionStorage": "workspace",
