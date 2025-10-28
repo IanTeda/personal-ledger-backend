@@ -1,5 +1,5 @@
 # Use the official Rust image as the base image for building
-FROM rust:1.90-slim as builder
+FROM rust:1.90-slim AS builder
 
 # Install required dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -17,6 +17,9 @@ ENV DATABASE_URL="sqlite:///tmp/db.sqlite"
 # Copy the Cargo.toml and Cargo.lock files
 COPY Cargo.toml Cargo.lock ./
 
+# Copy the proto files (submodule is already available in build context)
+COPY proto ./proto
+
 # Copy the migrations and run them to set up the database schema
 COPY migrations ./migrations
 RUN mkdir -p /tmp && touch /tmp/db.sqlite
@@ -25,7 +28,6 @@ RUN sqlx migrate run
 
 # Copy the source code
 COPY src ./src
-COPY proto ./proto
 COPY build.rs ./
 
 # Build the application in release mode
