@@ -34,6 +34,16 @@ RUN cargo build --release
 # Use a minimal base image for the runtime
 FROM debian:bookworm-slim
 
+# Add metadata labels
+LABEL maintainer="Ian Teda <ian@teda.id.au>" \
+      description="Personal Ledger Backend - A gRPC-based financial tracking service built with Rust and Tonic" \
+      version="0.1.0" \
+      repository="https://github.com/IanTeda/personal-ledger-backend" \
+      license="GPL-3.0" \
+      org.opencontainers.image.source="https://github.com/IanTeda/personal-ledger-backend" \
+      org.opencontainers.image.description="Personal Ledger Backend - gRPC service for financial data management" \
+      org.opencontainers.image.licenses="GPL-3.0"
+
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \

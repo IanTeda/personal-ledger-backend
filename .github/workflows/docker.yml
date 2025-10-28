@@ -2,19 +2,8 @@
 # This workflow automates the CI/CD process for containerizing the Rust backend application
 name: Build and Push Docker Image
 
-# Triggers: When to run this workflow
-# - push: Builds on every push to main/develop branches for continuous integration
-# - pull_request: Builds PRs targeting main/develop to validate changes before merge
-# - release: Builds and tags images when a new release is published for deployment
+# Workflow triggers on release publication
 on:
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
   release:
     types: [published]
 
