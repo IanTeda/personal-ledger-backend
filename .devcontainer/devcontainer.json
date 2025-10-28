@@ -35,19 +35,20 @@
         "fill-labs.dependi",
         "github.copilot",
         "gruntfuggly.todo-tree",
+        "mhutchie.git-graph",
         "ms-azuretools.vscode-docker",
         "ms-vscode.vscode-markdownlint",
         "mtxr.sqltools-driver-pg",
         "mtxr.sqltools-driver-sqlite",
         "mtxr.sqltools",
+        "qwtel.sqlite-viewer",
         "redhat.vscode-yaml",
         "rust-lang.rust-analyzer",
         "tamasfe.even-better-toml",
         "usernamehw.errorlens",
         "vadimcn.vscode-lldb",
-        "zxh404.vscode-proto3",
-        "qwtel.sqlite-viewer",
-        "vector-of-bool.gitflow"
+        "vector-of-bool.gitflow",
+        "zxh404.vscode-proto3"
       ],
       "settings": {
         "sqltools.useConnectionStorage": "workspace",
