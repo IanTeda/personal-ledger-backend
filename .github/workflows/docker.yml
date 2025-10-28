@@ -1,0 +1,67 @@
+# GitHub Actions workflow for building and pushing Docker images
+# This workflow automates the CI/CD process for containerizing the Rust backend application
+name: Build and Push Docker Image
+
+# Workflow triggers on release publication
+on:
+  release:
+    types: [published]
+
+# Environment variables used throughout the workflow
+env:
+  REGISTRY: ghcr.io  # GitHub Container Registry
+  IMAGE_NAME: ${{ github.repository }}  # Repository name as image name
+
+# Job definitions
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest  # Run on latest Ubuntu
+    permissions:
+      contents: read  # Read repository contents
+      packages: write  # Write to GitHub Packages (for pushing images)
+
+    steps:
+      # Checkout the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Set up QEMU for multi-architecture builds (enables building for ARM64 on AMD64 runners)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx for advanced build features like multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Authenticate with GitHub Container Registry to push images
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata for tagging the Docker image based on the event type
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch  # Tag with branch name
+            type=ref,event=pr      # Tag with PR number
+            type=semver,pattern={{version}}  # Semantic version tags
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}  # Latest tag for default branch
+
+      # Build and push the Docker image to the registry
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .  # Build context is the repository root
+          platforms: linux/amd64,linux/arm64  # Build for both AMD64 and ARM64 architectures
+          push: true  # Push the image after building
+          tags: ${{ steps.meta.outputs.tags }}  # Use tags from metadata step
+          labels: ${{ steps.meta.outputs.labels }}  # Use labels from metadata step
+          cache-from: type=gha  # Use GitHub Actions cache for faster builds
+          cache-to: type=gha,mode=max  # Store cache in GitHub Actions
