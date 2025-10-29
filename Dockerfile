@@ -1,15 +1,16 @@
-# Use the official Rust image as the base image for building
+# -------------------------------[ BUILDER ]------------------------------------
+
+# 0.3 Build the binary.
+
 FROM rust:1.90-slim AS builder
 
 # Install required dependencies for building
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     protobuf-compiler \
+    libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/*
-
-# Set the working directory
-WORKDIR /app
 
 # Set a dummy DATABASE_URL for SQLx compile-time checks
 ENV DATABASE_URL="sqlite:///tmp/db.sqlite"
@@ -31,7 +32,12 @@ COPY src ./src
 COPY build.rs ./
 
 # Build the application in release mode
-RUN cargo build --release
+RUN cargo build --release --bin personal_ledger_backend
+
+
+# ------------------------------[ RUNTIME IMAGE ]-------------------------------
+
+# Copy the binary to the runtime image
 
 # Use a minimal base image for the runtime
 FROM debian:bookworm-slim
@@ -69,13 +75,13 @@ COPY config ./config
 RUN chown -R appuser:appuser /app
 
 # Create volume directories
-VOLUME ["/app/config", "/app/data"]
+VOLUME ["/config", "/data"]
 
 # Switch to the non-root user
 USER appuser
 
 # Set environment variable for data directory
-ENV DATA_DIR=/app/data
+ENV DATA_DIR=/data
 
 # Expose the port the app runs on (adjust if different)
 EXPOSE 50065
