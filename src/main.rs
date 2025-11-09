@@ -20,8 +20,9 @@ async fn main() -> LedgerResult<()> {
     // Initialize the database connection pool and run migrations
     let database_url = ledger_config.server.database_url()?;
     let database_pool = database::DatabasePool::new(&database_url);
+    let database = database_pool.connect().await?;
 
-    let tonic_server = server::TonicServer::new(database_pool.into_pool()?, ledger_config).await?;
+    let tonic_server = server::TonicServer::new(database.into_pool()?, ledger_config).await?;
 
     tonic_server.run().await?;
 

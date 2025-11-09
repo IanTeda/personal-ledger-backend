@@ -106,10 +106,16 @@ impl TonicServer {
     /// ```
     pub async fn new(database_pool: sqlx::SqlitePool, ledger_config: crate::LedgerConfig) -> LedgerResult<Self> {
         let router = server::Router::new(database_pool, ledger_config.clone()).await?;
+        tracing::debug!("New tonic server router created");
+
         let address = ledger_config.server.address()?;
         let listener = TokioNet::TcpListener::bind(address).await?;
+        tracing::debug!("Tonic server bound to {}", listener.local_addr()?);
 
-        Ok(Self { router, listener })
+        let tonic_server = Self { router, listener };
+        tracing::debug!("New Tonic server instance created.");
+
+        Ok(tonic_server)
     }
 
     /// Get the local address that the server is bound to.
@@ -189,12 +195,12 @@ impl TonicServer {
     /// For testing scenarios, consider using `serve_with_incoming()` with a controlled stream.
     pub async fn run(self) -> LedgerResult<()> {
         let addr_string = self.address_string()?;
-        tracing::info!("Tonic server listening on {}", addr_string);
 
         let incoming = TcpListenerStream::new(self.listener);
         let router = self.router;
         router.into_inner().serve_with_incoming(incoming).await?;
 
+        tracing::info!("Tonic server listening on {}", addr_string);
         Ok(())
     }
 

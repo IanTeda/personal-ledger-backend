@@ -1,5 +1,26 @@
-# GitHub Actions workflow for building and pushing Docker images
-# This workflow automates the CI/CD process for containerizing the Rust backend application
+# GitHub Actions Workflow: Build and Push Docker Images
+#
+# This workflow automates the CI/CD pipeline for building and publishing Docker images
+# of the Personal Ledger Backend Rust application. It runs on GitHub's hosted runners
+# and integrates with GitHub Container Registry (GHCR) for image storage.
+#
+# Workflow Overview:
+# - Triggers: Runs when a GitHub release is published from the main branch
+# - Jobs: Single job 'build-and-push' that handles checkout, setup, build, and push
+# - Platforms: Builds multi-architecture images for Linux AMD64 and ARM64
+# - Registry: Pushes to ghcr.io (GitHub Container Registry)
+#
+# GitHub Actions Used:
+# - actions/checkout@v6: Checks out repository code with submodules
+# - docker/setup-qemu-action@v3: Enables emulation for ARM64 builds on AMD64 runners
+# - docker/setup-buildx-action@v3: Sets up Docker Buildx for advanced build features
+# - docker/login-action@v3: Authenticates with GHCR using GITHUB_TOKEN
+# - docker/metadata-action@v5: Generates tags and labels based on Git ref and semver
+# - docker/build-push-action@v6: Builds and pushes multi-platform Docker images
+#
+# Environment: Runs on ubuntu-latest with necessary permissions for package writes.
+
+# Workflow name displayed in GitHub UI
 name: Build and Push Docker Image
 
 # Workflow triggers on release publication
@@ -15,6 +36,8 @@ env:
 # Job definitions
 jobs:
   build-and-push:
+    # Only run if the release was created from the main branch
+    if: github.event.release.target_commitish == 'main'
     runs-on: ubuntu-latest  # Run on latest Ubuntu
     permissions:
       contents: read  # Read repository contents
@@ -23,7 +46,9 @@ jobs:
     steps:
       # Checkout the repository code
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive  # Pull git submodules (e.g., protos/)
 
       # Set up QEMU for multi-architecture builds (enables building for ARM64 on AMD64 runners)
       - name: Set up QEMU
@@ -48,6 +73,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=ref,event=tag  # Tag with release tag name
             type=ref,event=branch  # Tag with branch name
             type=ref,event=pr      # Tag with PR number
             type=semver,pattern={{version}}  # Semantic version tags
@@ -56,7 +82,7 @@ jobs:
 
       # Build and push the Docker image to the registry
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .  # Build context is the repository root
           platforms: linux/amd64,linux/arm64  # Build for both AMD64 and ARM64 architectures
