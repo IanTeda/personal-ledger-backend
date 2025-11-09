@@ -354,6 +354,7 @@ mod tests {
     use super::*;
     use crate::database;
     use std::sync::Arc;
+    use tokio;
 
     #[test]
     fn test_from_database_category_to_rpc_category() {
@@ -465,8 +466,8 @@ mod tests {
         assert!(rpc_category.updated_on.is_some());
     }
 
-    #[test]
-    fn test_categories_service_new() {
+    #[tokio::test]
+    async fn test_categories_service_new() {
         // Test that CategoriesService::new creates an instance correctly
         let pool = Arc::new(sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap());
         let config = Arc::new(crate::LedgerConfig::default());
@@ -477,8 +478,8 @@ mod tests {
         assert_eq!(Arc::strong_count(&config), 2);
     }
 
-    #[test]
-    fn test_database_ref() {
+    #[tokio::test]
+    async fn test_database_ref() {
         // Test that database_ref returns the correct reference
         let pool = Arc::new(sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap());
         let config = Arc::new(crate::LedgerConfig::default());
