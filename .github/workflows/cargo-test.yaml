@@ -1,0 +1,54 @@
+# GitHub Actions Workflow: Cargo Test Suite
+#
+# This workflow runs the complete test suite for the Personal Ledger Backend Rust application,
+# including unit tests (in src/) and integration tests (in tests/). It ensures code quality
+# and prevents regressions by running tests on every push to the main branch.
+#
+# Workflow Overview:
+# - Triggers: Runs on pushes to the main branch
+# - Jobs: Single job 'test' that runs on ubuntu-latest
+# - Tests: Executes cargo test for both unit and integration tests
+# - Caching: Uses Rust cache for faster builds
+#
+# GitHub Actions Used:
+# - actions/checkout@v4: Checks out repository code with submodules
+# - dtolnay/rust-toolchain@stable: Sets up stable Rust toolchain
+# - Swatinem/rust-cache@v2: Caches Cargo dependencies for faster runs
+# - Custom protoc installation: Installs Protocol Buffers compiler for builds
+
+# Workflow name displayed in GitHub UI
+name: Cargo Test Suite
+
+# Trigger on push to main branch
+on:
+  push:
+    branches: [main]
+
+# Job to run tests
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository with submodules
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Install protobuf compiler (required for build.rs)
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      # Set up Rust toolchain
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Cache dependencies for faster builds
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # Run all tests (unit and integration)
+      - name: Run tests
+        run: cargo test
