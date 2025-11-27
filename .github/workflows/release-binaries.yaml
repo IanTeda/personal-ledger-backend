@@ -1,6 +1,30 @@
-# GitHub Actions workflow for building and adding binaries to the releasing
-# This workflow builds cross-platform binaries for the Rust application on release
-name: Build Binaries and add to Release
+# GitHub Actions Workflow: Build and Release Binaries
+#
+# This workflow automates the cross-platform compilation and distribution of binaries
+# for the Personal Ledger Backend Rust application. It builds optimized release binaries
+# for multiple architectures and operating systems, then packages and uploads them
+# as release assets on GitHub.
+#
+# Workflow Overview:
+# - Triggers: Runs when a GitHub release is published from the main branch
+# - Jobs: Single matrix job 'build' that compiles for multiple platforms in parallel
+# - Platforms: Linux (x86_64, ARM64), macOS (x86_64, ARM64), Windows (x86_64)
+# - Outputs: Zipped/tarred binaries uploaded as GitHub release assets
+#
+# GitHub Actions Used:
+# - actions/checkout@v4: Checks out repository code with recursive submodule pulling
+# - Custom protoc installation: Installs Protocol Buffers compiler for gRPC builds
+# - dtolnay/rust-toolchain@stable: Sets up Rust with target-specific cross-compilation
+# - actions/upload-artifact@v4: Uploads build artifacts for inspection
+# - softprops/action-gh-release@v1: Uploads binaries as release assets
+#
+# Cross-Compilation Details:
+# - Uses Rust's built-in cross-compilation with custom linkers for ARM64
+# - Archives binaries as .tar.gz (Unix) or .zip (Windows) with architecture names
+# - Requires mutable releases enabled in repository settings for asset uploads
+
+# Workflow name displayed in GitHub UI
+name: Build Multi-Arch Binaries and Add to Release
 
 # Trigger on release publication
 on:
@@ -12,6 +36,8 @@ jobs:
   build:
     name: Build for ${{ matrix.os }} (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    # Only run if the release was created from the main branch
+    if: github.event.release.target_commitish == 'main'
     permissions:
       contents: write  # Required to upload release assets
 

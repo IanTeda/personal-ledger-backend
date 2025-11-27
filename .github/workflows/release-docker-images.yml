@@ -21,7 +21,7 @@
 # Environment: Runs on ubuntu-latest with necessary permissions for package writes.
 
 # Workflow name displayed in GitHub UI
-name: Build and Push Docker Image
+name: Build Multi-Arch Docker Images and Push to Packages
 
 # Workflow triggers on release publication
 on:
