@@ -49,6 +49,20 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
+      # Install SQLx CLI for database preparation
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features sqlite
+
+      # Set up database for SQLx offline mode
+      - name: Prepare SQLx queries
+        run: |
+          export DATABASE_URL="sqlite:test.db"
+          touch test.db
+          cargo sqlx migrate run
+          cargo sqlx prepare --check
+
       # Run all tests (unit and integration)
       - name: Run tests
         run: cargo test
+        env:
+          DATABASE_URL: sqlite:test.db
