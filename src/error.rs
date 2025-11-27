@@ -62,6 +62,10 @@ pub enum LedgerError {
     #[error("Tonic transport error: {0}")]
     TonicTransport(#[from] tonic::transport::Error),
 
+    /// Errors from Tonic reflection service
+    #[error("Tonic reflection error: {0}")]
+    TonicReflection(#[from] tonic_reflection::server::Error),
+
     /// Configuration errors from config module
     #[error("Configuration error: {0}")]
     Config(crate::config::ConfigError),
@@ -187,6 +191,10 @@ impl From<LedgerError> for tonic::Status {
                 tracing::error!(?e, "Tonic transport error");
                 tonic::Status::internal("Transport error occurred")
             }
+            LedgerError::TonicReflection(e) => {
+                tracing::error!(?e, "Tonic reflection error");
+                tonic::Status::internal("Reflection service error")
+            }
             LedgerError::Database(e) => {
                 tracing::error!(?e, "Database error");
                 tonic::Status::internal("Database error")
@@ -271,6 +279,9 @@ mod tests {
         assert!(matches!(grpc_err, LedgerError::Grpc(_)));
 
         // We cannot construct tonic::transport::Error directly because its constructor is private.
+        // Instead, we'll skip direct construction in this test.
+
+        // We cannot construct tonic_reflection::server::Error directly because its constructor is private.
         // Instead, we'll skip direct construction in this test.
 
         let config_err = LedgerError::Config(crate::config::ConfigError::Validation("test".to_string()));
@@ -361,6 +372,9 @@ mod tests {
 
         // Test TonicTransport variant
         // Cannot construct tonic::transport::Error directly, so we skip this test.
+
+        // Test TonicReflection variant
+        // Cannot construct tonic_reflection::server::Error directly, so we skip this test.
 
         // Test Config variant
         let config_err = LedgerError::Config(crate::config::ConfigError::Validation("Config error".to_string()));

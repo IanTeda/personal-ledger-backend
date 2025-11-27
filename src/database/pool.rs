@@ -180,14 +180,15 @@ impl DatabasePool {
       .map_err(|e| {
         // Connection failures are mapped to `Connection` to make it clear
         // the error occurred while establishing a connection.
-        tracing::error!(error = %e, url = %self.url, "Failed to establish database pool");
+        tracing::error!(error = %e, url = %self.url, "Connection error: failed to establish database pool");
         DatabaseError::Connection(e.to_string())
       })?;
 
-    tracing::info!("Database connection established");
-
     self.pool = Some(pool);
 
+    tracing::info!("Database connection established");
+
+    
     Ok(self)
   }
 
@@ -267,6 +268,7 @@ impl DatabasePool {
   /// # }
   /// ```
   pub fn into_pool(self) -> DatabaseResult<sqlx::SqlitePool> {
+    println!("Into pool called");
     self.pool
       .ok_or_else(|| DatabaseError::Connection("Database pool is not connected".into()))
   }

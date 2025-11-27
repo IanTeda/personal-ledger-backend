@@ -1,0 +1,130 @@
+# GitHub Actions Workflow: Build and Release Binaries
+#
+# This workflow automates the cross-platform compilation and distribution of binaries
+# for the Personal Ledger Backend Rust application. It builds optimized release binaries
+# for multiple architectures and operating systems, then packages and uploads them
+# as release assets on GitHub.
+#
+# Workflow Overview:
+# - Triggers: Runs when a GitHub release is published from the main branch
+# - Jobs: Single matrix job 'build' that compiles for multiple platforms in parallel
+# - Platforms: Linux (x86_64, ARM64), macOS (x86_64, ARM64), Windows (x86_64)
+# - Outputs: Zipped/tarred binaries uploaded as GitHub release assets
+#
+# GitHub Actions Used:
+# - actions/checkout@v4: Checks out repository code with recursive submodule pulling
+# - Custom protoc installation: Installs Protocol Buffers compiler for gRPC builds
+# - dtolnay/rust-toolchain@stable: Sets up Rust with target-specific cross-compilation
+# - actions/upload-artifact@v4: Uploads build artifacts for inspection
+# - softprops/action-gh-release@v1: Uploads binaries as release assets
+#
+# Cross-Compilation Details:
+# - Uses Rust's built-in cross-compilation with custom linkers for ARM64
+# - Archives binaries as .tar.gz (Unix) or .zip (Windows) with architecture names
+# - Requires mutable releases enabled in repository settings for asset uploads
+
+# Workflow name displayed in GitHub UI
+name: Build Multi-Arch Binaries and Add to Release
+
+# Trigger on release publication
+on:
+  release:
+    types: [published]
+
+# Job to build binaries for multiple platforms
+jobs:
+  build:
+    name: Build for ${{ matrix.os }} (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    # Only run if the release was created from the main branch
+    if: github.event.release.target_commitish == 'main'
+    permissions:
+      contents: write  # Required to upload release assets
+
+    # Matrix strategy for cross-platform builds
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: personal_ledger_backend
+            archive_ext: .tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            binary_name: personal_ledger_backend
+            archive_ext: .tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: personal_ledger_backend.exe
+            archive_ext: .zip
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: personal_ledger_backend
+            archive_ext: .tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: personal_ledger_backend
+            archive_ext: .tar.gz
+
+    steps:
+      # Checkout repository with submodules
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Install protobuf compiler (required for build.rs)
+      - name: Install protobuf compiler (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install protobuf compiler (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+
+      - name: Install protobuf compiler (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc
+
+      # Set up Rust toolchain
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Install cross-compilation tools for ARM64 Linux
+      - name: Install ARM64 cross-compiler
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      # Build the binary in release mode
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }} --bin personal_ledger_backend
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      # Zip the binary with architecture name
+      - name: Zip binary (Windows)
+        if: runner.os == 'Windows'
+        run: 7z a personal_ledger_backend-${{ matrix.target }}${{ matrix.archive_ext }} target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+
+      - name: Zip binary (Unix)
+        if: runner.os != 'Windows'
+        run: tar -czf personal_ledger_backend-${{ matrix.target }}${{ matrix.archive_ext }} -C target/${{ matrix.target }}/release ${{ matrix.binary_name }}
+
+      # Upload zipped binary as artifact for inspection
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-binary
+          path: personal_ledger_backend-${{ matrix.target }}${{ matrix.archive_ext }}
+
+      # Upload zipped binary to GitHub release
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: personal_ledger_backend-${{ matrix.target }}${{ matrix.archive_ext }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

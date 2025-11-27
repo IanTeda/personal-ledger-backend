@@ -21,12 +21,15 @@
     }
   },
   "mounts": [
-    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:SSH_AUTH_SOCK},target=/tmp/ssh-agent.sock,type=bind"
   ],
-  "postCreateCommand": "rustup component add clippy rustfmt && cargo install cargo-make cargo-watch cargo-audit sqlx-cli && npm install -g sqlite3@5.1.7",
+  "postCreateCommand": "rustup component add clippy rustfmt; cargo install cargo-make cargo-watch cargo-audit sqlx-cli; npm install -g sqlite3@5.1.7",
   "containerEnv": {
     "RUST_BACKTRACE": "1",
-    "CARGO_TERM_COLOR": "always"
+    "CARGO_TERM_COLOR": "always",
+    "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock"
   },
   "customizations": {
     "vscode": {
@@ -34,18 +37,21 @@
         "fill-labs.dependi",
         "github.copilot",
         "gruntfuggly.todo-tree",
+        "mhutchie.git-graph",
+        "mhutchie.git-graph",
         "ms-azuretools.vscode-docker",
         "ms-vscode.vscode-markdownlint",
         "mtxr.sqltools-driver-pg",
         "mtxr.sqltools-driver-sqlite",
         "mtxr.sqltools",
+        "qwtel.sqlite-viewer",
         "redhat.vscode-yaml",
         "rust-lang.rust-analyzer",
         "tamasfe.even-better-toml",
         "usernamehw.errorlens",
         "vadimcn.vscode-lldb",
-        "zxh404.vscode-proto3",
-        "qwtel.sqlite-viewer"
+        "vector-of-bool.gitflow",
+        "zxh404.vscode-proto3"
       ],
       "settings": {
         "sqltools.useConnectionStorage": "workspace",

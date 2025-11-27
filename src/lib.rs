@@ -38,6 +38,11 @@ pub use error::{LedgerError, LedgerResult};
 /// gRPC API module and types.
 pub mod rpc;
 
+/// Service layer for handling business logic and gRPC requests.
+pub mod services;
+
+pub mod server;
+
 /// Tracing and logging utilities.
 pub mod telemetry;
 

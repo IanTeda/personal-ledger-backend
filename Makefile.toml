@@ -13,6 +13,29 @@
 # Example: cargo make docs-serve
 # -----------------------------------------------------------------------------
 
+
+## Update git submodules in repository
+## $ git submodule update --recursive --remote
+## $ cargo make submodules
+[tasks.submodules]
+command = "git"
+args = ["submodule", "update", "--recursive", "--remote"]
+
+
+
+# -------------------------------[BINARY BUILDS]-------------------------------------
+
+## Run cargo tests
+## This task will run the project unit and integration tests
+## `$ cargo make test`
+[tasks.test]
+description = "Run cargo tests"
+command = "cargo"
+args = ["test"]
+
+
+# -------------------------------[MD BOOK]-------------------------------------
+
 [tasks.docs-rustdoc]
 description = "Build Rust docs (with RUSTDOCFLAGS to set asset root)"
 env = { RUSTDOCFLAGS = "-Z unstable-options --static-root-path /rust-docs" }
@@ -34,15 +57,10 @@ description = "Serve mdBook documentation on port 8001"
 command = "mdbook"
 args = ["serve", "--port", "8001"]
 
-## Update git submodules in repository
-## $ git submodule update --recursive --remote
-## $ cargo make submodules
-[tasks.submodules]
-command = "git"
-args = ["submodule", "update", "--recursive", "--remote"]
 
 
 # -------------------------------[DATABASE]------------------------------------
+
 ## Drop Database
 ## $ sqlx database drop
 ## $ cargo make db_drop
@@ -85,3 +103,72 @@ dependencies = [
     "db-prepare-generate",
     "db-prepare",
 ]
+
+# -------------------------------[DOCKER]------------------------------------
+## Build Docker image
+## $ docker build -t personal-ledger-backend .
+## $ cargo make docker-build
+[tasks.docker-build]
+description = "Build Docker image from Dockerfile"
+dependencies = ["test", "build"]
+command = "docker"
+args = ["build", "-t", "personal-ledger-backend", "."]
+
+## Test Docker image
+## $ docker run --rm personal-ledger-backend ./personal_ledger_backend --help
+## $ cargo make docker-test
+[tasks.docker-test]
+description = "Test the Docker image by running the binary with --help"
+dependencies = ["docker-build"]
+command = "docker"
+args = ["run", "--rm", "personal-ledger-backend", "./personal_ledger_backend", "--help"]
+
+
+# -------------------------------[CROSS-COMPILATION]----------------------------------
+## Build for Linux ARM64
+## $ rustup target add aarch64-unknown-linux-gnu
+## $ cargo make build-linux-arm64
+[tasks.build-linux-arm64]
+description = "Build binary for Linux ARM64 architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "aarch64-unknown-linux-gnu", "--bin", "personal_ledger_backend"]
+
+## Build for Linux x86_64
+## $ rustup target add x86_64-unknown-linux-gnu
+## $ cargo make build-linux-x64
+[tasks.build-linux-x64]
+description = "Build binary for Linux x86_64 architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "x86_64-unknown-linux-gnu", "--bin", "personal_ledger_backend"]
+
+## Build for macOS ARM64 (Apple Silicon)
+## $ rustup target add aarch64-apple-darwin
+## $ cargo make build-macos-arm64
+[tasks.build-macos-arm64]
+description = "Build binary for macOS ARM64 (Apple Silicon) architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "aarch64-apple-darwin", "--bin", "personal_ledger_backend"]
+
+## Build for macOS x86_64 (Apple Intel)
+## $ rustup target add x86_64-apple-darwin
+## $ cargo make build-macos-x64
+[tasks.build-macos-x64]
+description = "Build binary for macOS x86_64 (Apple Intel) architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "x86_64-apple-darwin", "--bin", "personal_ledger_backend"]
+
+## Build for Windows x64
+## $ rustup target add x86_64-pc-windows-msvc
+## $ cargo make build-windows-x64
+[tasks.build-windows-x64]
+description = "Build binary for Windows x64 architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "x86_64-pc-windows-msvc", "--bin", "personal_ledger_backend"]
+
+## Build for RISC-V 64-bit Linux
+## $ rustup target add riscv64gc-unknown-linux-gnu
+## $ cargo make build-riscv64
+[tasks.build-riscv64]
+description = "Build binary for RISC-V 64-bit Linux architecture"
+command = "cargo"
+args = ["build", "--release", "--target", "riscv64gc-unknown-linux-gnu", "--bin", "personal_ledger_backend"]

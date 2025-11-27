@@ -10,16 +10,15 @@
 # By Default, ignore all dot files `.*`, except for those with `!`
 .*
 !.gitignore
+!.gitattributes
 !.github
 !.devcontainer
 !.vscode
 !.gitmodules
 !.env.example
-!.cargo
-!.cargo/config.toml
-!.cargo/config
 !.mdbook-ignore
 !.editorconfig
+!.sqlx
 
 
 # ---------------------------[ UNDERSCOE FILES ]--------------------------------

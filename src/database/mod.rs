@@ -60,16 +60,6 @@ pub use error::DatabaseError;
 /// ```
 pub use error::DatabaseResult;
 
-mod categories;
-/// Financial category domain model.
-///
-/// Represents accounting categories (assets, liabilities, income, expenses, equity)
-/// used for classifying transactions and accounts. Includes validation and
-/// builder pattern support.
-///
-/// See [`categories`] module for implementation details.
-pub use categories::Category;
-
 mod pool;
 /// Database connection pool wrapper.
 ///
@@ -79,3 +69,14 @@ mod pool;
 ///
 /// See [`pool`] module for detailed API documentation and examples.
 pub use pool::DatabasePool;
+
+mod categories;
+/// Financial category domain model.
+///
+/// Represents accounting categories (assets, liabilities, income, expenses, equity)
+/// used for classifying transactions and accounts. Includes validation and
+/// builder pattern support.
+///
+/// See [`categories`] module for implementation details.
+pub use categories::Categories;
+pub use categories::CategoriesBuilder;

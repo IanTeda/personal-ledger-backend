@@ -96,10 +96,13 @@ impl LedgerConfig {
         // Validate the loaded configuration
         // ledger_config.validate()?;
 
-        println!(
-            "\n---------------------- [ CONFIGURATION ] ---------------------- \n{:#?} \n---------------------------------------------------------------",
-            ledger_config
-        );
+        // Only print configuration details if log level is DEBUG
+        if matches!(ledger_config.server.log_level, Some(crate::telemetry::LogLevel::DEBUG)) {
+            println!(
+                "\n---------------------- [ CONFIGURATION ] ---------------------- \n{:#?} \n---------------------------------------------------------------",
+                ledger_config
+            );
+        }
 
         Ok(ledger_config)
     }

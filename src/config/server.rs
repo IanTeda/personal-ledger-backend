@@ -7,6 +7,8 @@
 //!
 //! The configuration is designed for SQLite-backed deployments and supports
 //! settings for bind address, port, logging, TLS, data directory, and database path.
+//! 
+//! TODO: Add config dir and update Dockerfile
 
 use crate::{telemetry};
 use super::{ConfigResult, ConfigError};
